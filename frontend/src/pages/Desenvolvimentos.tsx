@@ -5,6 +5,8 @@ import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ProjectCardDialog } from '@/components/kanban/project-card-dialog'
 import { CreateProjectDialog } from '@/components/kanban/create-project-dialog'
 import { useProjects } from '@/hooks/use-projects'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { Project } from '@/types'
 
 export default function Desenvolvimentos() {
@@ -55,24 +57,27 @@ export default function Desenvolvimentos() {
   }
 
   return (
-    <div className="h-full flex flex-col relative">
-      <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
-        <KanbanBoard
-          projects={projects}
-          onProjectMove={handleProjectMove}
-          onProjectClick={handleProjectClick}
-        />
-      </div>
+    <ProtectedRoute permission="access_desenvolvimentos">
+      <div className="h-full flex flex-col relative">
+        <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
+          <KanbanBoard
+            projects={projects}
+            onProjectMove={handleProjectMove}
+            onProjectClick={handleProjectClick}
+          />
+        </div>
 
-      {/* Botão flutuante */}
-      <Button
-        onClick={() => setIsCreateDialogOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
-        size="icon"
-      >
-        <Plus className="h-6 w-6" />
-        <span className="sr-only">Novo Projeto</span>
-      </Button>
+        {/* Botão flutuante */}
+        <RequirePermission permission="move_card">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
+            size="icon"
+          >
+            <Plus className="h-6 w-6" />
+            <span className="sr-only">Novo Projeto</span>
+          </Button>
+        </RequirePermission>
 
       <CreateProjectDialog
         open={isCreateDialogOpen}
@@ -80,12 +85,13 @@ export default function Desenvolvimentos() {
         onCreate={handleCreateProject}
       />
 
-      <ProjectCardDialog
-        project={selectedProject}
-        open={isProjectDialogOpen}
-        onOpenChange={setIsProjectDialogOpen}
-        onUpdate={handleUpdateProject}
-      />
-    </div>
+        <ProjectCardDialog
+          project={selectedProject}
+          open={isProjectDialogOpen}
+          onOpenChange={setIsProjectDialogOpen}
+          onUpdate={handleUpdateProject}
+        />
+      </div>
+    </ProtectedRoute>
   )
 }

@@ -10,7 +10,7 @@ router.get('/:projectId', async (req, res) => {
     const { projectId } = req.params;
 
     const { data, error } = await supabase
-      .from('project_todos')
+      .from('cdt_project_todos')
       .select('*')
       .eq('project_id', projectId)
       .order('sort_order', { ascending: true });
@@ -37,7 +37,7 @@ router.post('/', async (req, res) => {
 
     // Get the max sort_order for this project
     const { data: maxTodo } = await supabase
-      .from('project_todos')
+      .from('cdt_project_todos')
       .select('sort_order')
       .eq('project_id', project_id)
       .order('sort_order', { ascending: false })
@@ -47,7 +47,7 @@ router.post('/', async (req, res) => {
     const sort_order = maxTodo ? maxTodo.sort_order + 1 : 0;
 
     const { data, error } = await supabase
-      .from('project_todos')
+      .from('cdt_project_todos')
       .insert({
         project_id,
         title,
@@ -75,13 +75,20 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { title, completed, assigned_to } = req.body;
 
+    // Buscar TODO atual para verificar se assigned_to mudou
+    const { data: currentTodo } = await supabase
+      .from('cdt_project_todos')
+      .select('assigned_to, project_id')
+      .eq('id', id)
+      .single();
+
     const updateData: any = {};
     if (title !== undefined) updateData.title = title;
     if (completed !== undefined) updateData.completed = completed;
     if (assigned_to !== undefined) updateData.assigned_to = assigned_to || null;
 
     const { data, error } = await supabase
-      .from('project_todos')
+      .from('cdt_project_todos')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -89,6 +96,28 @@ router.put('/:id', async (req, res) => {
 
     if (error) {
       throw error;
+    }
+
+    // Se assigned_to mudou e foi atribuído a alguém, criar notificação
+    if (assigned_to && assigned_to !== currentTodo?.assigned_to) {
+      // Buscar nome do projeto
+      const { data: project } = await supabase
+        .from('cdt_projects')
+        .select('name')
+        .eq('id', currentTodo?.project_id)
+        .single();
+
+      // Criar notificação
+      await supabase
+        .from('cdt_notifications')
+        .insert({
+          user_id: assigned_to,
+          type: 'todo_assigned',
+          title: 'Novo TODO atribuído',
+          message: `Você foi atribuído como responsável pelo TODO "${title || data.title}" no projeto "${project?.name || 'Projeto'}"`,
+          related_id: id,
+          related_type: 'todo',
+        });
     }
 
     res.json(data);
@@ -104,7 +133,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     const { error } = await supabase
-      .from('project_todos')
+      .from('cdt_project_todos')
       .delete()
       .eq('id', id);
 
@@ -131,7 +160,7 @@ router.post('/reorder', async (req, res) => {
     // Update sort_order for each todo
     const updates = todo_ids.map((todoId: string, index: number) => 
       supabase
-        .from('project_todos')
+        .from('cdt_project_todos')
         .update({ sort_order: index })
         .eq('id', todoId)
         .eq('project_id', project_id)

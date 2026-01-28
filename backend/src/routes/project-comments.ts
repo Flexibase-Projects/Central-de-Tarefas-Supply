@@ -9,7 +9,7 @@ router.get('/:projectId', async (req, res) => {
     const { projectId } = req.params;
 
     const { data, error } = await supabase
-      .from('comments')
+      .from('cdt_comments')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: true });
@@ -35,7 +35,7 @@ router.post('/', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('comments')
+      .from('cdt_comments')
       .insert({
         project_id,
         content,
@@ -67,7 +67,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('comments')
+      .from('cdt_comments')
       .update({ content })
       .eq('id', id)
       .select()
@@ -90,7 +90,7 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     const { error } = await supabase
-      .from('comments')
+      .from('cdt_comments')
       .delete()
       .eq('id', id);
 

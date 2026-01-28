@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('activities')
+      .from('cdt_activities')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -33,7 +33,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('activities')
+      .from('cdt_activities')
       .select('*')
       .eq('id', id)
       .single();
@@ -82,7 +82,7 @@ router.post('/', async (req, res) => {
     }
     
     const { data, error } = await supabase
-      .from('activities')
+      .from('cdt_activities')
       .insert([{
         name: activity.name,
         description: activity.description || null,
@@ -148,7 +148,7 @@ router.put('/:id', async (req, res) => {
     if (updates.assigned_to !== undefined) updateData.assigned_to = updates.assigned_to;
 
     const { data, error } = await supabase
-      .from('activities')
+      .from('cdt_activities')
       .update(updateData)
       .eq('id', id)
       .select()

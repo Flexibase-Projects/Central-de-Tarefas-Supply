@@ -1,9 +1,13 @@
 import { useState } from 'react'
 import { ProjectTodo } from '@/types'
 import { useTodos } from '@/hooks/use-todos'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useUsersList } from '@/hooks/use-users-list'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Trash2, GripVertical, Plus, Loader2 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Trash2, GripVertical, Plus, Loader2, User } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -30,9 +34,12 @@ interface TodoItemProps {
   todo: ProjectTodo
   onToggle: (id: string, completed: boolean) => void
   onDelete: (id: string) => void
+  onAssign: (id: string, userId: string | null) => void
+  assignedUserName?: string | null
+  users: Array<{ id: string; name: string }>
 }
 
-function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
+function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users }: TodoItemProps) {
   const {
     attributes,
     listeners,
@@ -52,7 +59,7 @@ function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group"
+      className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group w-full"
     >
       <div
         {...attributes}
@@ -68,7 +75,7 @@ function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
         className="h-4 w-4 rounded border-gray-300"
       />
       <span
-        className={`flex-1 text-sm ${
+        className={`flex-1 text-sm min-w-0 ${
           todo.completed
             ? 'line-through text-muted-foreground'
             : 'text-foreground'
@@ -76,6 +83,23 @@ function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
       >
         {todo.title}
       </span>
+      <select
+        value={todo.assigned_to || ''}
+        onChange={(e) => onAssign(todo.id, e.target.value || null)}
+        className="h-7 min-w-[140px] px-2 rounded-md border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 shrink-0"
+        disabled={todo.completed}
+      >
+        <option value="">Sem responsável</option>
+        {users.length === 0 ? (
+          <option disabled>Carregando usuários...</option>
+        ) : (
+          users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.name}
+            </option>
+          ))
+        )}
+      </select>
       <Button
         variant="ghost"
         size="sm"
@@ -91,7 +115,15 @@ function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
 export function TodoList({ projectId }: TodoListProps) {
   const { todos, loading, createTodo, updateTodo, deleteTodo, reorderTodos } =
     useTodos(projectId)
+  const { hasPermission } = usePermissions()
+  const { users, loading: usersLoading, error: usersError } = useUsersList()
+  const canCreateTodo = hasPermission('create_todo')
   const [newTodoTitle, setNewTodoTitle] = useState('')
+
+  // Debug: verificar se usuários estão sendo carregados
+  if (usersError) {
+    console.error('Erro ao carregar usuários:', usersError)
+  }
 
   // Calculate progress percentage
   const completedCount = todos.filter((todo) => todo.completed).length
@@ -138,6 +170,14 @@ export function TodoList({ projectId }: TodoListProps) {
     }
   }
 
+  const handleAssign = async (todoId: string, userId: string | null) => {
+    try {
+      await updateTodo(todoId, { assigned_to: userId })
+    } catch (error) {
+      console.error('Error assigning todo:', error)
+    }
+  }
+
   const handleToggle = async (id: string, completed: boolean) => {
     try {
       await updateTodo(id, { completed })
@@ -175,22 +215,26 @@ export function TodoList({ projectId }: TodoListProps) {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Input
-          value={newTodoTitle}
-          onChange={(e) => setNewTodoTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleCreateTodo()
-            }
-          }}
-          placeholder="Adicionar novo item..."
-          className="flex-1"
-        />
-        <Button onClick={handleCreateTodo} size="sm">
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
+      <RequirePermission permission="create_todo">
+        <div className="flex gap-2">
+          <Input
+            value={newTodoTitle}
+            onChange={(e) => setNewTodoTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleCreateTodo()
+              }
+            }}
+            placeholder="Adicionar novo item..."
+            className="flex-1"
+            disabled={!canCreateTodo}
+          />
+          <Button onClick={handleCreateTodo} size="sm" disabled={!canCreateTodo || !newTodoTitle.trim()}>
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </RequirePermission>
 
       {loading ? (
         <div className="flex items-center justify-center py-4">
@@ -211,14 +255,20 @@ export function TodoList({ projectId }: TodoListProps) {
             strategy={verticalListSortingStrategy}
           >
             <div className="space-y-1">
-              {todos.map((todo) => (
-                <TodoItem
-                  key={todo.id}
-                  todo={todo}
-                  onToggle={handleToggle}
-                  onDelete={handleDelete}
-                />
-              ))}
+              {todos.map((todo) => {
+                const assignedUser = users.find(u => u.id === todo.assigned_to)
+                return (
+                  <TodoItem
+                    key={todo.id}
+                    todo={todo}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                    onAssign={handleAssign}
+                    assignedUserName={assignedUser?.name || null}
+                    users={users.filter(u => u.is_active)}
+                  />
+                )
+              })}
             </div>
           </SortableContext>
         </DndContext>

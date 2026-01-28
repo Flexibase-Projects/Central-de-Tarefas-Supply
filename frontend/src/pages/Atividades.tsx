@@ -5,6 +5,8 @@ import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ActivityCardDialog } from '@/components/kanban/activity-card-dialog'
 import { CreateActivityDialog } from '@/components/kanban/create-activity-dialog'
 import { useActivities } from '@/hooks/use-activities'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { Activity } from '@/types'
 import { Project } from '@/types'
 
@@ -73,24 +75,27 @@ export default function Atividades() {
   }
 
   return (
-    <div className="h-full flex flex-col relative">
-      <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
-        <KanbanBoard
-          projects={projectsAsActivities}
-          onProjectMove={handleProjectMove}
-          onProjectClick={handleProjectClick}
-        />
-      </div>
+    <ProtectedRoute permission="access_atividades">
+      <div className="h-full flex flex-col relative">
+        <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
+          <KanbanBoard
+            projects={projectsAsActivities}
+            onProjectMove={handleProjectMove}
+            onProjectClick={handleProjectClick}
+          />
+        </div>
 
-      {/* Botão flutuante */}
-      <Button
-        onClick={() => setIsCreateDialogOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
-        size="icon"
-      >
-        <Plus className="h-6 w-6" />
-        <span className="sr-only">Nova Atividade</span>
-      </Button>
+        {/* Botão flutuante */}
+        <RequirePermission permission="move_card">
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
+            size="icon"
+          >
+            <Plus className="h-6 w-6" />
+            <span className="sr-only">Nova Atividade</span>
+          </Button>
+        </RequirePermission>
 
       <CreateActivityDialog
         open={isCreateDialogOpen}
@@ -98,12 +103,13 @@ export default function Atividades() {
         onCreate={handleCreateActivity}
       />
 
-      <ActivityCardDialog
-        activity={selectedActivity}
-        open={isActivityDialogOpen}
-        onOpenChange={setIsActivityDialogOpen}
-        onUpdate={handleUpdateActivity}
-      />
-    </div>
+        <ActivityCardDialog
+          activity={selectedActivity}
+          open={isActivityDialogOpen}
+          onOpenChange={setIsActivityDialogOpen}
+          onUpdate={handleUpdateActivity}
+        />
+      </div>
+    </ProtectedRoute>
   )
 }

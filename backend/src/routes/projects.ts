@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('projects')
+      .from('cdt_projects')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -33,7 +33,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('projects')
+      .from('cdt_projects')
       .select('*')
       .eq('id', id)
       .single();
@@ -64,7 +64,7 @@ router.post('/', async (req, res) => {
     console.log('Creating project with data:', project);
     
     const { data, error } = await supabase
-      .from('projects')
+      .from('cdt_projects')
       .insert([{
         name: project.name,
         description: project.description || null,
@@ -121,7 +121,7 @@ router.put('/:id', async (req, res) => {
     if (updates.github_repo !== undefined) updateData.github_repo = updates.github_repo;
 
     const { data, error } = await supabase
-      .from('projects')
+      .from('cdt_projects')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -143,7 +143,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('projects')
+      .from('cdt_projects')
       .delete()
       .eq('id', id);
 

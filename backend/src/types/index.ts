@@ -81,3 +81,63 @@ export interface GitHubRepository {
   default_branch: string;
   updated_at: string;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Permission {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  category: string;
+  created_at: string;
+}
+
+export interface UserRole {
+  id: string;
+  user_id: string;
+  role_id: string;
+  assigned_by: string | null;
+  created_at: string;
+}
+
+export interface RolePermission {
+  id: string;
+  role_id: string;
+  permission_id: string;
+  created_at: string;
+}
+
+export interface UserWithRole extends User {
+  role?: Role;
+  permissions?: Permission[];
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  message: string | null;
+  related_id: string | null;
+  related_type: string | null;
+  read: boolean;
+  created_at: string;
+}

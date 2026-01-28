@@ -15,6 +15,7 @@ import {
 import { Project } from '@/types'
 import { KanbanColumn } from './kanban-column'
 import { KanbanCard } from './kanban-card'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useState, useEffect } from 'react'
 
 const columns = [
@@ -34,6 +35,9 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projects, onProjectMove, onProjectClick }: KanbanBoardProps) {
+  const { hasPermission } = usePermissions()
+  const canMoveCard = hasPermission('move_card')
+  
   // Estado local otimista para atualização em tempo real
   const [localProjects, setLocalProjects] = useState<Project[]>(projects)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -56,6 +60,7 @@ export function KanbanBoard({ projects, onProjectMove, onProjectClick }: KanbanB
       activationConstraint: {
         distance: 8,
       },
+      disabled: !canMoveCard,
     })
   )
 

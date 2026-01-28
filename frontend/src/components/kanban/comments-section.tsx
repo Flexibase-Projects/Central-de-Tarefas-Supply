@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Comment } from '@/types'
 import { useProjectComments } from '@/hooks/use-project-comments'
+import { useAuth } from '@/contexts/AuthContext'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Trash2, Send, Loader2, User } from 'lucide-react'
@@ -57,6 +58,7 @@ export function CommentsSection({ projectId }: CommentsSectionProps) {
     createComment,
     deleteComment,
   } = useProjectComments(projectId)
+  const { currentUser } = useAuth()
   const [newComment, setNewComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -68,8 +70,8 @@ export function CommentsSection({ projectId }: CommentsSectionProps) {
       await createComment({
         project_id: projectId,
         content: newComment.trim(),
-        author_name: 'Usuário', // Temporário até sistema de usuários
-        author_email: null,
+        author_name: currentUser?.name || 'Usuário Anônimo',
+        author_email: currentUser?.email || null,
       })
       setNewComment('')
     } catch (error) {

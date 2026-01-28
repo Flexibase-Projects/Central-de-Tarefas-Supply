@@ -60,7 +60,7 @@ npm run install:all
 
 Crie um arquivo `.env` na raiz do projeto:
 ```env
-VITE_API_URL=http://localhost:3001
+VITE_API_URL=http://localhost:3002
 VITE_SUPABASE_URL=sua_url_do_supabase
 VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
 ```
@@ -71,9 +71,13 @@ SUPABASE_URL=sua_url_do_supabase
 SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
 SUPABASE_SERVICE_ROLE_KEY=sua_chave_service_role_do_supabase
 GITHUB_TOKEN=seu_token_github_opcional
-PORT=3001
-FRONTEND_URL=http://localhost:3000
+PORT=3002
+FRONTEND_URL=http://localhost:3003
 ```
+
+**Nota:** As portas padrão foram alteradas temporariamente para evitar conflitos:
+- Frontend: `http://localhost:3003` (antes: 3000)
+- Backend: `http://localhost:3002` (antes: 3001)
 
 ### 🔑 Configuração do GitHub Token (Opcional)
 

@@ -44,12 +44,16 @@ import activitiesRoutes from './routes/activities.js';
 import githubRoutes from './routes/github.js';
 import todosRoutes from './routes/todos.js';
 import projectCommentsRoutes from './routes/project-comments.js';
+import permissionsRoutes from './routes/permissions.js';
+import rolesRoutes from './routes/roles.js';
+import usersRoutes from './routes/users.js';
+import notificationsRoutes from './routes/notifications.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3003',
   credentials: true
 }));
 
@@ -67,9 +71,13 @@ app.use('/api/activities', activitiesRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/todos', todosRoutes);
 app.use('/api/project-comments', projectCommentsRoutes);
+app.use('/api/permissions', permissionsRoutes);
+app.use('/api/roles', rolesRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+  console.log(`🚀 Backend server running on http://localhost:${PORT} (temporary port)`);
   
   const hasSupabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY);
   if (hasSupabase) {
