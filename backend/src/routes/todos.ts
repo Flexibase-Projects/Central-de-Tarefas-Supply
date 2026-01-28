@@ -62,6 +62,29 @@ router.post('/', async (req, res) => {
       throw error;
     }
 
+    // Se foi atribuído a alguém, criar notificação
+    if (assigned_to) {
+      // Buscar nome do projeto
+      const { data: project } = await supabase
+        .from('cdt_projects')
+        .select('name')
+        .eq('id', project_id)
+        .single();
+
+      // Criar notificação
+      await supabase
+        .from('cdt_notifications')
+        .insert({
+          user_id: assigned_to,
+          type: 'todo_assigned',
+          title: 'Novo TO-DO para você!',
+          message: `Você foi atribuído como responsável pelo TODO "${title}" no projeto "${project?.name || 'Projeto'}"`,
+          related_id: data.id,
+          related_type: 'todo',
+          project_id: project_id,
+        });
+    }
+
     res.status(201).json(data);
   } catch (error: any) {
     console.error('Error creating todo:', error);
@@ -78,7 +101,7 @@ router.put('/:id', async (req, res) => {
     // Buscar TODO atual para verificar se assigned_to mudou
     const { data: currentTodo } = await supabase
       .from('cdt_project_todos')
-      .select('assigned_to, project_id')
+      .select('assigned_to, project_id, completed')
       .eq('id', id)
       .single();
 
@@ -98,8 +121,26 @@ router.put('/:id', async (req, res) => {
       throw error;
     }
 
+    // Se TODO foi marcado como concluído ou assigned_to foi removido, deletar notificação
+    if (completed === true || (assigned_to === null && currentTodo?.assigned_to)) {
+      await supabase
+        .from('cdt_notifications')
+        .delete()
+        .eq('related_id', id)
+        .eq('related_type', 'todo');
+    }
     // Se assigned_to mudou e foi atribuído a alguém, criar notificação
-    if (assigned_to && assigned_to !== currentTodo?.assigned_to) {
+    else if (assigned_to && assigned_to !== currentTodo?.assigned_to && completed !== true) {
+      // Deletar notificação antiga se houver
+      if (currentTodo?.assigned_to) {
+        await supabase
+          .from('cdt_notifications')
+          .delete()
+          .eq('related_id', id)
+          .eq('related_type', 'todo')
+          .eq('user_id', currentTodo.assigned_to);
+      }
+
       // Buscar nome do projeto
       const { data: project } = await supabase
         .from('cdt_projects')
@@ -113,10 +154,11 @@ router.put('/:id', async (req, res) => {
         .insert({
           user_id: assigned_to,
           type: 'todo_assigned',
-          title: 'Novo TODO atribuído',
+          title: 'Novo TO-DO para você!',
           message: `Você foi atribuído como responsável pelo TODO "${title || data.title}" no projeto "${project?.name || 'Projeto'}"`,
           related_id: id,
           related_type: 'todo',
+          project_id: currentTodo?.project_id || null,
         });
     }
 
@@ -131,6 +173,13 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Deletar notificações relacionadas antes de deletar o TODO
+    await supabase
+      .from('cdt_notifications')
+      .delete()
+      .eq('related_id', id)
+      .eq('related_type', 'todo');
 
     const { error } = await supabase
       .from('cdt_project_todos')

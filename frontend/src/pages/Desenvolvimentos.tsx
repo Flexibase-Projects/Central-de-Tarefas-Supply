@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
@@ -8,12 +8,36 @@ import { useProjects } from '@/hooks/use-projects'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RequirePermission } from '@/components/auth/RequirePermission'
 import { Project } from '@/types'
+import { useSearchParams } from 'react-router-dom'
 
 export default function Desenvolvimentos() {
   const { projects, loading, createProject, updateProject, moveProject } = useProjects()
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const [highlightedTodoId, setHighlightedTodoId] = useState<string | null>(null)
+
+  // Abrir projeto quando houver parâmetro na URL
+  useEffect(() => {
+    const projectId = searchParams.get('project')
+    const todoId = searchParams.get('todo')
+    if (projectId && projects.length > 0 && !isProjectDialogOpen) {
+      const project = projects.find((p) => p.id === projectId)
+      if (project) {
+        setSelectedProject(project)
+        setIsProjectDialogOpen(true)
+        if (todoId) {
+          setHighlightedTodoId(todoId)
+          // Remover o destaque após 3 segundos
+          setTimeout(() => setHighlightedTodoId(null), 3000)
+        }
+        // Remover parâmetro da URL após abrir
+        setSearchParams({}, { replace: true })
+      }
+    }
+  }, [searchParams, projects, isProjectDialogOpen, setSearchParams])
 
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project)
@@ -90,6 +114,7 @@ export default function Desenvolvimentos() {
           open={isProjectDialogOpen}
           onOpenChange={setIsProjectDialogOpen}
           onUpdate={handleUpdateProject}
+          highlightedTodoId={highlightedTodoId}
         />
       </div>
     </ProtectedRoute>

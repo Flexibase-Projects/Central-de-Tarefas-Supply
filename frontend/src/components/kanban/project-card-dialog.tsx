@@ -72,6 +72,7 @@ interface ProjectCardDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpdate: (project: Project) => void
+  highlightedTodoId?: string | null
 }
 
 export function ProjectCardDialog({
@@ -79,6 +80,7 @@ export function ProjectCardDialog({
   open,
   onOpenChange,
   onUpdate,
+  highlightedTodoId,
 }: ProjectCardDialogProps) {
   const { getRecentCommits, getRepositoryInfo, getReadme, loading: githubLoading } = useGitHub()
   const [commits, setCommits] = useState<GitHubCommit[]>([])
@@ -140,7 +142,7 @@ export function ProjectCardDialog({
                     TO-DO
                   </h3>
                   <div className="rounded-lg border p-4">
-                    <TodoList projectId={project.id} />
+                    <TodoList projectId={project.id} highlightedTodoId={highlightedTodoId} />
                   </div>
                 </div>
 

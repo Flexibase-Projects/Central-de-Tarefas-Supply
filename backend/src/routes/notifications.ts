@@ -4,6 +4,59 @@ import { Notification } from '../types/index.js';
 
 const router = express.Router();
 
+// Função para limpar notificações órfãs (TODOs que não existem mais)
+async function cleanupOrphanedNotifications() {
+  try {
+    // Buscar todas as notificações relacionadas a TODOs
+    const { data: todoNotifications, error: fetchError } = await supabase
+      .from('cdt_notifications')
+      .select('id, related_id')
+      .eq('related_type', 'todo');
+
+    if (fetchError) {
+      console.error('Error fetching notifications for cleanup:', fetchError);
+      return;
+    }
+
+    if (!todoNotifications || todoNotifications.length === 0) {
+      return;
+    }
+
+    // Buscar todos os IDs de TODOs existentes
+    const { data: existingTodos, error: todosError } = await supabase
+      .from('cdt_project_todos')
+      .select('id');
+
+    if (todosError) {
+      console.error('Error fetching todos for cleanup:', todosError);
+      return;
+    }
+
+    const existingTodoIds = new Set(existingTodos?.map(t => t.id) || []);
+
+    // Encontrar notificações órfãs
+    const orphanedNotificationIds = todoNotifications
+      .filter(n => n.related_id && !existingTodoIds.has(n.related_id))
+      .map(n => n.id);
+
+    if (orphanedNotificationIds.length > 0) {
+      // Deletar notificações órfãs
+      const { error: deleteError } = await supabase
+        .from('cdt_notifications')
+        .delete()
+        .in('id', orphanedNotificationIds);
+
+      if (deleteError) {
+        console.error('Error deleting orphaned notifications:', deleteError);
+      } else {
+        console.log(`🧹 Limpadas ${orphanedNotificationIds.length} notificações órfãs`);
+      }
+    }
+  } catch (error: any) {
+    console.error('Error in cleanupOrphanedNotifications:', error);
+  }
+}
+
 // Get all notifications for current user
 router.get('/', async (req, res) => {
   try {
@@ -12,6 +65,9 @@ router.get('/', async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'User ID required' });
     }
+
+    // Limpar notificações órfãs antes de buscar
+    await cleanupOrphanedNotifications();
 
     const { data, error } = await supabase
       .from('cdt_notifications')

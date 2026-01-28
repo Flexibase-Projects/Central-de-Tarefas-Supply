@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import * as React from 'react'
 import { ProjectTodo } from '@/types'
 import { useTodos } from '@/hooks/use-todos'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -28,6 +29,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 interface TodoListProps {
   projectId: string
+  highlightedTodoId?: string | null
 }
 
 interface TodoItemProps {
@@ -37,9 +39,10 @@ interface TodoItemProps {
   onAssign: (id: string, userId: string | null) => void
   assignedUserName?: string | null
   users: Array<{ id: string; name: string }>
+  isHighlighted?: boolean
 }
 
-function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users }: TodoItemProps) {
+function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users, isHighlighted }: TodoItemProps) {
   const {
     attributes,
     listeners,
@@ -49,6 +52,26 @@ function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users 
     isDragging,
   } = useSortable({ id: todo.id })
 
+  const itemRef = React.useRef<HTMLDivElement>(null)
+  const [shouldHighlight, setShouldHighlight] = React.useState(false)
+
+  // Scroll para o item destacado quando ele aparecer e iniciar animação
+  React.useEffect(() => {
+    if (isHighlighted && itemRef.current) {
+      setTimeout(() => {
+        itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 300)
+      setShouldHighlight(true)
+      // Remover destaque após animação (3 piscadas de 0.5s cada = 1.5s)
+      const timer = setTimeout(() => {
+        setShouldHighlight(false)
+      }, 1500)
+      return () => clearTimeout(timer)
+    } else {
+      setShouldHighlight(false)
+    }
+  }, [isHighlighted])
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -57,9 +80,18 @@ function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users 
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node)
+        if (node) {
+          itemRef.current = node
+        }
+      }}
       style={style}
-      className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 group w-full"
+      className={`flex items-center gap-2 p-2 rounded group w-full transition-all ${
+        shouldHighlight
+          ? 'bg-yellow-100 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-500 shadow-md animate-pulse-3'
+          : 'hover:bg-muted/50'
+      }`}
     >
       <div
         {...attributes}
@@ -112,7 +144,7 @@ function TodoItem({ todo, onToggle, onDelete, onAssign, assignedUserName, users 
   )
 }
 
-export function TodoList({ projectId }: TodoListProps) {
+export function TodoList({ projectId, highlightedTodoId }: TodoListProps) {
   const { todos, loading, createTodo, updateTodo, deleteTodo, reorderTodos } =
     useTodos(projectId)
   const { hasPermission } = usePermissions()
@@ -265,7 +297,8 @@ export function TodoList({ projectId }: TodoListProps) {
                     onDelete={handleDelete}
                     onAssign={handleAssign}
                     assignedUserName={assignedUser?.name || null}
-                    users={users.filter(u => u.is_active)}
+                    users={users}
+                    isHighlighted={highlightedTodoId === todo.id}
                   />
                 )
               })}

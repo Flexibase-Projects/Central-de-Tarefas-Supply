@@ -154,6 +154,7 @@ export interface Notification {
   message: string | null
   related_id: string | null
   related_type: string | null
+  project_id: string | null
   read: boolean
   created_at: string
 }

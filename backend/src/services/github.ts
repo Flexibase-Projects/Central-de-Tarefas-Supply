@@ -98,6 +98,63 @@ export async function getRepositoryInfo(owner: string, repo: string): Promise<Gi
 }
 
 /**
+ * Get total commit count from a repository
+ * @param owner Repository owner
+ * @param repo Repository name
+ */
+export async function getTotalCommits(owner: string, repo: string): Promise<number> {
+  const octokitInstance = getOctokit();
+  if (!octokitInstance) {
+    console.warn('GitHub token not configured. Please set GITHUB_TOKEN in .env');
+    return 0;
+  }
+
+  try {
+    // Use contributors stats API which provides total commits per contributor
+    const { data: stats } = await octokitInstance.repos.getContributorsStats({
+      owner,
+      repo,
+    });
+
+    if (stats && Array.isArray(stats)) {
+      // Sum all contributions from all contributors
+      return stats.reduce((sum, stat) => sum + (stat.total || 0), 0);
+    }
+
+    // Fallback: use contributors API and paginate through all contributors
+    let totalCommits = 0;
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data: contributors } = await octokitInstance.repos.listContributors({
+        owner,
+        repo,
+        per_page: 100,
+        page,
+        anon: 'true',
+      });
+
+      if (contributors.length === 0) {
+        hasMore = false;
+      } else {
+        totalCommits += contributors.reduce((sum, contributor) => sum + contributor.contributions, 0);
+        page++;
+        // Stop if we got less than 100 (last page)
+        if (contributors.length < 100) {
+          hasMore = false;
+        }
+      }
+    }
+
+    return totalCommits;
+  } catch (error: any) {
+    console.error('Error fetching total commits:', error);
+    return 0;
+  }
+}
+
+/**
  * Get recent commits from a repository
  * @param owner Repository owner
  * @param repo Repository name

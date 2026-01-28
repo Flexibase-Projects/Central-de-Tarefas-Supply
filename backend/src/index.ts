@@ -49,6 +49,61 @@ import rolesRoutes from './routes/roles.js';
 import usersRoutes from './routes/users.js';
 import notificationsRoutes from './routes/notifications.js';
 
+// Função para limpar notificações órfãs na inicialização
+async function initializeCleanup() {
+  try {
+    const { supabase } = await import('./config/supabase.js');
+    
+    // Buscar todas as notificações relacionadas a TODOs
+    const { data: todoNotifications, error: fetchError } = await supabase
+      .from('cdt_notifications')
+      .select('id, related_id')
+      .eq('related_type', 'todo');
+
+    if (fetchError) {
+      console.error('Error fetching notifications for cleanup:', fetchError);
+      return;
+    }
+
+    if (!todoNotifications || todoNotifications.length === 0) {
+      return;
+    }
+
+    // Buscar todos os IDs de TODOs existentes
+    const { data: existingTodos, error: todosError } = await supabase
+      .from('cdt_project_todos')
+      .select('id');
+
+    if (todosError) {
+      console.error('Error fetching todos for cleanup:', todosError);
+      return;
+    }
+
+    const existingTodoIds = new Set(existingTodos?.map(t => t.id) || []);
+
+    // Encontrar notificações órfãs
+    const orphanedNotificationIds = todoNotifications
+      .filter(n => n.related_id && !existingTodoIds.has(n.related_id))
+      .map(n => n.id);
+
+    if (orphanedNotificationIds.length > 0) {
+      // Deletar notificações órfãs
+      const { error: deleteError } = await supabase
+        .from('cdt_notifications')
+        .delete()
+        .in('id', orphanedNotificationIds);
+
+      if (deleteError) {
+        console.error('Error deleting orphaned notifications:', deleteError);
+      } else {
+        console.log(`🧹 Limpadas ${orphanedNotificationIds.length} notificações órfãs na inicialização`);
+      }
+    }
+  } catch (error: any) {
+    console.error('Error in initializeCleanup:', error);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3002;
 
@@ -76,7 +131,7 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT} (temporary port)`);
   
   const hasSupabase = process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY);
@@ -84,6 +139,9 @@ app.listen(PORT, () => {
     console.log('✅ Supabase configured - database operations enabled');
     console.log(`   URL: ${process.env.SUPABASE_URL?.substring(0, 30)}...`);
     console.log(`   Key: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SERVICE_ROLE' : 'ANON'} key set`);
+    
+    // Limpar notificações órfãs na inicialização
+    await initializeCleanup();
   } else {
     console.warn('⚠️  Supabase not configured - database operations will fail');
     console.warn('⚠️  Create backend/.env.local with SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY');

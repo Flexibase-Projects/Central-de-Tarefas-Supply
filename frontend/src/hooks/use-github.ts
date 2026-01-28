@@ -96,6 +96,28 @@ export function useGitHub() {
     }
   }, [])
 
+  const getCommitsCount = useCallback(async (url: string): Promise<number> => {
+    try {
+      setLoading(true)
+      setError(null)
+      const fetchUrl = API_URL ? `${API_URL}/api/github/commits-count?url=${encodeURIComponent(url)}` : `/api/github/commits-count?url=${encodeURIComponent(url)}`
+      const response = await fetch(fetchUrl)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to fetch commit count')
+      }
+      const data = await response.json()
+      return data.count || 0
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
+      console.error('Error fetching commit count:', err)
+      return 0
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   return {
     loading,
     error,
@@ -103,5 +125,6 @@ export function useGitHub() {
     getRecentCommits,
     getContributors,
     getReadme,
+    getCommitsCount,
   }
 }

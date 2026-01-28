@@ -4,6 +4,25 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes pulse-3 {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  16.66%, 50%, 83.33% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+  33.33%, 66.66% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-pulse-3 {
+  animation: pulse-3 0.5s ease-in-out 3;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
