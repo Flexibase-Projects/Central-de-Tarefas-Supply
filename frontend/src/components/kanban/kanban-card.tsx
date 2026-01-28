@@ -1,5 +1,4 @@
 import { Project } from '@/types'
-import { ExternalLink, GitBranch } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -32,6 +31,17 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
     done: 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800',
   }
 
+  const priorityBadgeColors = {
+    backlog: 'bg-muted-foreground/20 text-muted-foreground border-muted-foreground/30',
+    todo: 'bg-blue-500 text-white border-blue-600',
+    in_progress: 'bg-yellow-500 text-white border-yellow-600',
+    review: 'bg-purple-500 text-white border-purple-600',
+    done: 'bg-green-500 text-white border-green-600',
+  }
+
+  // Prioridade temporária (será implementada futuramente)
+  const priority = 1
+
   return (
     <div
       ref={setNodeRef}
@@ -40,14 +50,23 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
       {...listeners}
       onClick={onClick}
       className={cn(
-        'group cursor-pointer rounded-lg border-2 p-4 shadow-sm transition-all hover:shadow-md',
+        'group cursor-grab active:cursor-grabbing rounded-lg border-2 p-4 shadow-sm transition-all hover:shadow-md relative',
         statusColors[project.status],
-        isDragging && 'opacity-50'
+        isDragging && 'opacity-0'
       )}
     >
+      {/* Bolinha de prioridade flutuante */}
+      <div className={cn(
+        'absolute -top-2 -right-2 h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md border-2 border-background z-10',
+        priorityBadgeColors[project.status]
+      )}>
+        {String(priority).padStart(2, '0')}
+      </div>
+
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm truncate">{project.name}</h3>
+          <div className="h-px bg-border mt-2 mb-2" />
           {project.description && (
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
               {project.description}
@@ -55,22 +74,6 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
           )}
         </div>
       </div>
-      
-      {project.github_url && (
-        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <GitBranch className="h-3 w-3" />
-          <a
-            href={project.github_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 hover:text-foreground transition-colors"
-          >
-            Ver repositório
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      )}
     </div>
   )
 }

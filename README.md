@@ -65,7 +65,7 @@ VITE_SUPABASE_URL=sua_url_do_supabase
 VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
 ```
 
-Crie um arquivo `backend/.env`:
+Crie um arquivo `backend/.env` ou `backend/.env.local`:
 ```env
 SUPABASE_URL=sua_url_do_supabase
 SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
@@ -74,6 +74,37 @@ GITHUB_TOKEN=seu_token_github_opcional
 PORT=3001
 FRONTEND_URL=http://localhost:3000
 ```
+
+### 🔑 Configuração do GitHub Token (Opcional)
+
+Para usar a integração com GitHub e puxar commits dos projetos, você precisa criar um **Personal Access Token** no GitHub:
+
+1. **Criar o Token no GitHub:**
+   - Acesse: https://github.com/settings/tokens
+   - Clique em **"Generate new token"** → **"Generate new token (classic)"**
+   - Dê um nome descritivo (ex: "CDT-Inteligencia")
+   - Selecione as permissões necessárias:
+     - ✅ `repo` (acesso completo a repositórios privados) - se precisar acessar repositórios privados
+     - ✅ `public_repo` (acesso a repositórios públicos) - se só precisar de repositórios públicos
+   - Clique em **"Generate token"**
+   - **IMPORTANTE**: Copie o token imediatamente (você não conseguirá vê-lo novamente!)
+
+2. **Adicionar ao arquivo de ambiente:**
+   - Abra `backend/.env` ou `backend/.env.local`
+   - Adicione a linha:
+   ```env
+   GITHUB_TOKEN=ghp_seu_token_aqui
+   ```
+
+3. **Reiniciar o backend:**
+   - Pare o servidor (Ctrl+C)
+   - Execute novamente: `npm run dev`
+
+4. **Verificar se está funcionando:**
+   - O backend mostrará no console se o token foi carregado
+   - Ao criar/editar um projeto com URL do GitHub, o sistema tentará buscar informações automaticamente
+
+**Nota**: Sem o token, o sistema ainda funciona normalmente, mas não conseguirá buscar commits e informações dos repositórios do GitHub.
 
 4. **Configure o banco de dados**
 

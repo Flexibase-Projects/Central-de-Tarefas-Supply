@@ -1,5 +1,5 @@
 import express from 'express';
-import { getRepositoryInfo, getRecentCommits, getContributors, parseGitHubUrl } from '../services/github.js';
+import { getRepositoryInfo, getRecentCommits, getContributors, getReadme, parseGitHubUrl } from '../services/github.js';
 
 const router = express.Router();
 
@@ -70,6 +70,32 @@ router.get('/contributors', async (req, res) => {
   } catch (error: any) {
     console.error('Error fetching contributors:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch contributors' });
+  }
+});
+
+// Get README
+router.get('/readme', async (req, res) => {
+  try {
+    const { url } = req.query;
+    
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'GitHub URL is required' });
+    }
+
+    const parsed = parseGitHubUrl(url);
+    if (!parsed) {
+      return res.status(400).json({ error: 'Invalid GitHub URL' });
+    }
+
+    const readme = await getReadme(parsed.owner, parsed.repo);
+    if (readme === null) {
+      return res.status(404).json({ error: 'README not found' });
+    }
+
+    res.json({ content: readme });
+  } catch (error: any) {
+    console.error('Error fetching README:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch README' });
   }
 });
 

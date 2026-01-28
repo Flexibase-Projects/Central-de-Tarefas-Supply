@@ -1,9 +1,17 @@
 import { Octokit } from '@octokit/rest';
 
-const githubToken = process.env.GITHUB_TOKEN;
+// Lazy initialization of Octokit - ensures dotenv.config() has run first
+let _octokit: Octokit | null = null;
 
-// Initialize Octokit only if token is provided
-export const octokit = githubToken ? new Octokit({ auth: githubToken }) : null;
+function getOctokit(): Octokit | null {
+  if (_octokit === null) {
+    const githubToken = process.env.GITHUB_TOKEN;
+    if (githubToken) {
+      _octokit = new Octokit({ auth: githubToken });
+    }
+  }
+  return _octokit;
+}
 
 export interface GitHubRepository {
   id: number;
@@ -17,6 +25,13 @@ export interface GitHubRepository {
   open_issues_count: number;
   default_branch: string;
   updated_at: string;
+  created_at: string;
+  size: number;
+  watchers_count: number;
+  license: string | null;
+  topics: string[];
+  archived: boolean;
+  private: boolean;
 }
 
 export interface GitHubCommit {
@@ -48,13 +63,14 @@ export interface GitHubContributor {
  * @param repo Repository name
  */
 export async function getRepositoryInfo(owner: string, repo: string): Promise<GitHubRepository | null> {
-  if (!octokit) {
+  const octokitInstance = getOctokit();
+  if (!octokitInstance) {
     console.warn('GitHub token not configured. Please set GITHUB_TOKEN in .env');
     return null;
   }
 
   try {
-    const { data } = await octokit.repos.get({ owner, repo });
+    const { data } = await octokitInstance.repos.get({ owner, repo });
     return {
       id: data.id,
       name: data.name,
@@ -67,6 +83,13 @@ export async function getRepositoryInfo(owner: string, repo: string): Promise<Gi
       open_issues_count: data.open_issues_count,
       default_branch: data.default_branch,
       updated_at: data.updated_at,
+      created_at: data.created_at,
+      size: data.size,
+      watchers_count: data.watchers_count,
+      license: data.license?.name || null,
+      topics: data.topics || [],
+      archived: data.archived || false,
+      private: data.private || false,
     };
   } catch (error) {
     console.error('Error fetching repository info:', error);
@@ -85,13 +108,14 @@ export async function getRecentCommits(
   repo: string,
   limit: number = 10
 ): Promise<GitHubCommit[]> {
-  if (!octokit) {
+  const octokitInstance = getOctokit();
+  if (!octokitInstance) {
     console.warn('GitHub token not configured. Please set GITHUB_TOKEN in .env');
     return [];
   }
 
   try {
-    const { data } = await octokit.repos.listCommits({
+    const { data } = await octokitInstance.repos.listCommits({
       owner,
       repo,
       per_page: limit,
@@ -125,13 +149,14 @@ export async function getRecentCommits(
  * @param repo Repository name
  */
 export async function getContributors(owner: string, repo: string): Promise<GitHubContributor[]> {
-  if (!octokit) {
+  const octokitInstance = getOctokit();
+  if (!octokitInstance) {
     console.warn('GitHub token not configured. Please set GITHUB_TOKEN in .env');
     return [];
   }
 
   try {
-    const { data } = await octokit.repos.listContributors({ owner, repo });
+    const { data } = await octokitInstance.repos.listContributors({ owner, repo });
     return data.map((contributor) => ({
       login: contributor.login,
       avatar_url: contributor.avatar_url,
@@ -140,6 +165,33 @@ export async function getContributors(owner: string, repo: string): Promise<GitH
   } catch (error) {
     console.error('Error fetching contributors:', error);
     return [];
+  }
+}
+
+/**
+ * Get repository README content
+ * @param owner Repository owner
+ * @param repo Repository name
+ */
+export async function getReadme(owner: string, repo: string): Promise<string | null> {
+  const octokitInstance = getOctokit();
+  if (!octokitInstance) {
+    console.warn('GitHub token not configured. Please set GITHUB_TOKEN in .env');
+    return null;
+  }
+
+  try {
+    const { data } = await octokitInstance.repos.getReadme({ owner, repo });
+    // Decode base64 content
+    const content = Buffer.from(data.content, 'base64').toString('utf-8');
+    return content;
+  } catch (error: any) {
+    // README might not exist, return null instead of throwing
+    if (error.status === 404) {
+      return null;
+    }
+    console.error('Error fetching README:', error);
+    return null;
   }
 }
 

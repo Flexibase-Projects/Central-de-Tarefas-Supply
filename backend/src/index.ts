@@ -40,7 +40,10 @@ import express from 'express';
 import cors from 'cors';
 import projectsRoutes from './routes/projects.js';
 import tasksRoutes from './routes/tasks.js';
+import activitiesRoutes from './routes/activities.js';
 import githubRoutes from './routes/github.js';
+import todosRoutes from './routes/todos.js';
+import projectCommentsRoutes from './routes/project-comments.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,7 +63,10 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/projects', projectsRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/activities', activitiesRoutes);
 app.use('/api/github', githubRoutes);
+app.use('/api/todos', todosRoutes);
+app.use('/api/project-comments', projectCommentsRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT}`);
@@ -77,5 +83,15 @@ app.listen(PORT, () => {
     console.log(`   SUPABASE_URL: ${process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing'}`);
     console.log(`   SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Set' : '❌ Missing'}`);
     console.log(`   SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'}`);
+  }
+
+  // GitHub token status
+  const hasGitHubToken = process.env.GITHUB_TOKEN;
+  if (hasGitHubToken) {
+    console.log('✅ GitHub token configured - GitHub API operations enabled');
+    console.log(`   Token: ${process.env.GITHUB_TOKEN.substring(0, 7)}...${process.env.GITHUB_TOKEN.substring(process.env.GITHUB_TOKEN.length - 4)}`);
+  } else {
+    console.warn('⚠️  GitHub token not configured - GitHub API operations will be limited');
+    console.warn('⚠️  Add GITHUB_TOKEN to backend/.env.local to enable full GitHub integration');
   }
 });

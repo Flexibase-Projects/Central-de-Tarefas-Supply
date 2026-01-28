@@ -103,7 +103,35 @@ CREATE INDEX IF NOT EXISTS idx_project_assignments_project_id ON project_assignm
 CREATE INDEX IF NOT EXISTS idx_project_assignments_user_id ON project_assignments(user_id);
 
 -- ============================================
--- 6. Tabela: github_repositories (Opcional - para cache)
+-- 6. Tabela: activities
+-- ============================================
+CREATE TABLE IF NOT EXISTS activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'backlog',
+  due_date TIMESTAMP WITH TIME ZONE,
+  priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+  assigned_to UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id)
+);
+
+-- Índices para activities
+CREATE INDEX IF NOT EXISTS idx_activities_status ON activities(status);
+CREATE INDEX IF NOT EXISTS idx_activities_created_at ON activities(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activities_assigned_to ON activities(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_activities_priority ON activities(priority);
+CREATE INDEX IF NOT EXISTS idx_activities_due_date ON activities(due_date);
+
+-- Trigger para atualizar updated_at em activities
+DROP TRIGGER IF EXISTS update_activities_updated_at ON activities;
+CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- 7. Tabela: github_repositories (Opcional - para cache)
 -- ============================================
 CREATE TABLE IF NOT EXISTS github_repositories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -135,6 +163,7 @@ ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE comments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE project_assignments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE activities DISABLE ROW LEVEL SECURITY;
 ALTER TABLE github_repositories DISABLE ROW LEVEL SECURITY;
 
 -- ============================================

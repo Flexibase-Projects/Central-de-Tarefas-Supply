@@ -21,8 +21,10 @@ export default function Desenvolvimentos() {
   const handleProjectMove = async (projectId: string, newStatus: Project['status']) => {
     try {
       await moveProject(projectId, newStatus)
+      // O hook useProjects já atualiza o estado automaticamente após o moveProject
     } catch (error) {
       console.error('Error moving project:', error)
+      throw error // Re-throw para que o kanban-board possa tratar o erro
     }
   }
 
@@ -53,27 +55,24 @@ export default function Desenvolvimentos() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between shrink-0 p-6 pb-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Desenvolvimentos</h1>
-          <p className="text-muted-foreground">
-            Gerencie seus projetos de desenvolvimento em um Kanban interativo
-          </p>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Projeto
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-hidden px-6 pb-6">
+    <div className="h-full flex flex-col relative">
+      <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
         <KanbanBoard
           projects={projects}
           onProjectMove={handleProjectMove}
           onProjectClick={handleProjectClick}
         />
       </div>
+
+      {/* Botão flutuante */}
+      <Button
+        onClick={() => setIsCreateDialogOpen(true)}
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
+        size="icon"
+      >
+        <Plus className="h-6 w-6" />
+        <span className="sr-only">Novo Projeto</span>
+      </Button>
 
       <CreateProjectDialog
         open={isCreateDialogOpen}

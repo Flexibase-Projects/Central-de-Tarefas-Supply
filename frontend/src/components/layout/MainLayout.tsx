@@ -13,7 +13,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/sidebar'
-import { LayoutDashboard, Code2 } from 'lucide-react'
+import { LayoutDashboard, Code2, CheckSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface MainLayoutProps {
@@ -31,11 +31,44 @@ const menuItems = [
     url: '/desenvolvimentos',
     icon: Code2,
   },
+  {
+    title: 'Atividades',
+    url: '/atividades',
+    icon: CheckSquare,
+  },
 ]
 
 function MainLayoutContent({ children }: MainLayoutProps) {
   const location = useLocation()
   const { state } = useSidebar()
+
+  // Obter título e descrição baseado na rota atual
+  const getPageInfo = () => {
+    const currentItem = menuItems.find(item => item.url === location.pathname)
+    if (currentItem) {
+      if (currentItem.url === '/desenvolvimentos') {
+        return {
+          title: 'Desenvolvimentos',
+          description: 'Gerencie seus projetos de desenvolvimento em um Kanban interativo'
+        }
+      }
+      if (currentItem.url === '/atividades') {
+        return {
+          title: 'Atividades',
+          description: 'Gerencie suas atividades em um Kanban interativo'
+        }
+      }
+      if (currentItem.url === '/') {
+        return {
+          title: 'Dashboard',
+          description: 'Visão geral do departamento de Inteligência'
+        }
+      }
+    }
+    return { title: '', description: '' }
+  }
+
+  const pageInfo = getPageInfo()
 
   return (
     <div className="flex h-screen w-full">
@@ -82,9 +115,17 @@ function MainLayoutContent({ children }: MainLayoutProps) {
         </SidebarContent>
       </Sidebar>
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4">
+        <header className="flex shrink-0 items-center gap-4 border-b border-border px-6 py-4 min-h-[80px]">
           <SidebarTrigger />
-          <div className="flex-1" />
+          {pageInfo.title && (
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold tracking-tight">{pageInfo.title}</h1>
+              {pageInfo.description && (
+                <p className="text-sm text-muted-foreground mt-1">{pageInfo.description}</p>
+              )}
+            </div>
+          )}
+          {!pageInfo.title && <div className="flex-1" />}
         </header>
         <div className="flex-1 overflow-hidden">
           {children}

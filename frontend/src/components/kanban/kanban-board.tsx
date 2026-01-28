@@ -1,16 +1,21 @@
 import {
   DndContext,
   DragEndEvent,
-  DragOverlay,
+  DragOverEvent,
   DragStartEvent,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
+  closestCorners,
+  getFirstCollision,
+  pointerWithin,
+  rectIntersection,
 } from '@dnd-kit/core'
 import { Project } from '@/types'
 import { KanbanColumn } from './kanban-column'
 import { KanbanCard } from './kanban-card'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const columns = [
   { id: 'backlog', title: 'Backlog' },
@@ -29,7 +34,22 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ projects, onProjectMove, onProjectClick }: KanbanBoardProps) {
+  // Estado local otimista para atualização em tempo real
+  const [localProjects, setLocalProjects] = useState<Project[]>(projects)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [draggedOverColumn, setDraggedOverColumn] = useState<ColumnId | null>(null)
+
+  // Sincronizar projetos locais quando props mudarem (mas não durante drag)
+  // Também sincronizar após um pequeno delay para garantir que o backend atualizou
+  useEffect(() => {
+    if (!activeId) {
+      // Pequeno delay para garantir que o estado do hook foi atualizado após o backend
+      const timeoutId = setTimeout(() => {
+        setLocalProjects(projects)
+      }, 100)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [projects, activeId])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -43,32 +63,144 @@ export function KanbanBoard({ projects, onProjectMove, onProjectClick }: KanbanB
     setActiveId(event.active.id as string)
   }
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event
+    if (!over || !activeId) {
+      setDraggedOverColumn(null)
+      return
+    }
 
-    if (!over) return
-
-    const projectId = active.id as string
+    const projectId = activeId as string
     const newStatus = over.id as ColumnId
+    
+    // Validar se é uma coluna válida
+    if (columns.some(col => col.id === newStatus)) {
+      setDraggedOverColumn(newStatus)
+      setLocalProjects(prev => {
+        const project = prev.find(p => p.id === projectId)
+        // Só atualizar se realmente mudou de coluna
+        if (project && project.status !== newStatus) {
+          return prev.map(p => 
+            p.id === projectId ? { ...p, status: newStatus } : p
+          )
+        }
+        return prev
+      })
+    } else {
+      setDraggedOverColumn(null)
+    }
+  }
 
-    // Only move if status changed
-    const project = projects.find(p => p.id === projectId)
-    if (project && project.status !== newStatus) {
-      onProjectMove(projectId, newStatus)
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over, collisions } = event
+    const projectId = active.id as string
+
+    // Limpar estados de drag
+    setActiveId(null)
+    setDraggedOverColumn(null)
+
+    let targetColumn: ColumnId | null = null
+
+    // Se tem over direto, usar ele
+    if (over) {
+      const overId = over.id as string
+      if (columns.some(col => col.id === overId)) {
+        targetColumn = overId as ColumnId
+      }
+    }
+
+    // Se não encontrou coluna direta, procurar nas colisões
+    if (!targetColumn && collisions) {
+      for (const collision of collisions) {
+        const collisionId = collision.id as string
+        if (columns.some(col => col.id === collisionId)) {
+          targetColumn = collisionId as ColumnId
+          break
+        }
+      }
+    }
+
+    // Se ainda não encontrou, usar a coluna que estava sendo arrastada sobre
+    if (!targetColumn && draggedOverColumn) {
+      targetColumn = draggedOverColumn
+    }
+
+    // Se não encontrou nenhuma coluna válida, restaurar estado original
+    if (!targetColumn) {
+      setLocalProjects(projects)
+      return
+    }
+
+    // Buscar o projeto original (antes do drag)
+    const originalProject = projects.find(p => p.id === projectId)
+    
+    if (!originalProject) {
+      setLocalProjects(projects)
+      return
+    }
+
+    // Se o status realmente mudou, atualizar backend
+    if (originalProject.status !== targetColumn) {
+      // Manter o estado otimista (já atualizado durante o drag)
+      // Chamar callback para atualizar backend
+      onProjectMove(projectId, targetColumn).catch((error) => {
+        // Se der erro, restaurar estado original
+        console.error('Error moving project:', error)
+        setLocalProjects(projects)
+      })
+    } else {
+      // Se não mudou, restaurar estado original
+      setLocalProjects(projects)
     }
   }
 
   const getProjectsByStatus = (status: ColumnId) => {
-    return projects.filter(p => p.status === status)
+    return localProjects.filter(p => p.status === status)
   }
 
-  const activeProject = activeId ? projects.find(p => p.id === activeId) : null
+  const activeProject = activeId ? localProjects.find(p => p.id === activeId) : null
+
+  // Função customizada de detecção de colisão que sempre encontra a coluna mais próxima
+  const collisionDetection = (args: any) => {
+    // Primeiro tenta pointerWithin (se o ponteiro está dentro de algo)
+    const pointerCollisions = pointerWithin(args)
+    
+    // Se encontrou colisões com pointer, filtra para colunas válidas
+    if (pointerCollisions.length > 0) {
+      const columnCollisions = pointerCollisions.filter((collision: any) => 
+        columns.some(col => col.id === collision.id)
+      )
+      if (columnCollisions.length > 0) {
+        return columnCollisions
+      }
+    }
+
+    // Se não encontrou com pointer, usa rectIntersection (intersecção de retângulos)
+    const rectCollisions = rectIntersection(args)
+    if (rectCollisions.length > 0) {
+      const columnCollisions = rectCollisions.filter((collision: any) => 
+        columns.some(col => col.id === collision.id)
+      )
+      if (columnCollisions.length > 0) {
+        return columnCollisions
+      }
+    }
+
+    // Por último, usa closestCorners para encontrar a coluna mais próxima
+    const closestCollisions = closestCorners(args)
+    const columnCollisions = closestCollisions.filter((collision: any) => 
+      columns.some(col => col.id === collision.id)
+    )
+    
+    return columnCollisions.length > 0 ? columnCollisions : closestCollisions
+  }
 
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-6 h-full overflow-x-auto overflow-y-hidden">
@@ -79,12 +211,14 @@ export function KanbanBoard({ projects, onProjectMove, onProjectClick }: KanbanB
             title={column.title}
             projects={getProjectsByStatus(column.id)}
             onProjectClick={onProjectClick}
+            isDraggedOver={draggedOverColumn === column.id}
+            activeDragId={activeId}
           />
         ))}
       </div>
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {activeProject ? (
-          <div className="rotate-3 opacity-90">
+          <div className="rotate-2 opacity-95">
             <KanbanCard project={activeProject} />
           </div>
         ) : null}

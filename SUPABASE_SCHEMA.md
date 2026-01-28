@@ -119,7 +119,40 @@ CREATE INDEX idx_project_assignments_user_id ON project_assignments(user_id);
 
 **Roles válidos**: `owner`, `developer`, `reviewer`
 
-### 5. `github_repositories` (Opcional - para cache)
+### 5. `activities`
+
+Armazena atividades gerais do departamento.
+
+```sql
+CREATE TABLE activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'backlog',
+  due_date TIMESTAMP WITH TIME ZONE,
+  priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+  assigned_to UUID REFERENCES auth.users(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id)
+);
+
+-- Índices
+CREATE INDEX idx_activities_status ON activities(status);
+CREATE INDEX idx_activities_created_at ON activities(created_at DESC);
+CREATE INDEX idx_activities_assigned_to ON activities(assigned_to);
+CREATE INDEX idx_activities_priority ON activities(priority);
+CREATE INDEX idx_activities_due_date ON activities(due_date);
+
+-- Trigger para atualizar updated_at
+CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON activities
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+```
+
+**Status válidos**: `backlog`, `todo`, `in_progress`, `review`, `done`
+**Priority válidos**: `low`, `medium`, `high`
+
+### 6. `github_repositories` (Opcional - para cache)
 
 Armazena informações em cache dos repositórios GitHub.
 
@@ -155,6 +188,7 @@ ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE comments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE project_assignments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE activities DISABLE ROW LEVEL SECURITY;
 ALTER TABLE github_repositories DISABLE ROW LEVEL SECURITY;
 ```
 
@@ -166,6 +200,7 @@ ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 
 -- Políticas básicas (ajustar conforme necessário)
 CREATE POLICY "Users can view all projects" ON projects FOR SELECT USING (true);
@@ -182,7 +217,7 @@ CREATE POLICY "Users can delete projects" ON projects FOR DELETE USING (true);
 2. Vá em SQL Editor
 3. Execute os scripts SQL acima na ordem:
    - Primeiro crie a função `update_updated_at_column()`
-   - Depois crie as tabelas na ordem: `projects`, `tasks`, `comments`, `project_assignments`, `github_repositories`
+   - Depois crie as tabelas na ordem: `projects`, `tasks`, `comments`, `project_assignments`, `activities`, `github_repositories`
    - Crie os índices
    - Configure as políticas RLS conforme necessário
 

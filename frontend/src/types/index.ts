@@ -31,6 +31,20 @@ export interface Comment {
   content: string
   created_at: string
   created_by: string | null
+  author_name?: string | null
+  author_email?: string | null
+}
+
+export interface ProjectTodo {
+  id: string
+  project_id: string
+  title: string
+  completed: boolean
+  assigned_to: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+  created_by: string | null
 }
 
 export interface GitHubCommit {
@@ -62,4 +76,24 @@ export interface GitHubRepository {
   open_issues_count: number
   default_branch: string
   updated_at: string
+  created_at: string
+  size: number
+  watchers_count: number
+  license: string | null
+  topics: string[]
+  archived: boolean
+  private: boolean
+}
+
+export interface Activity {
+  id: string
+  name: string
+  description: string | null
+  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done'
+  due_date: string | null
+  priority: 'low' | 'medium' | 'high'
+  assigned_to: string | null
+  created_at: string
+  updated_at: string
+  created_by: string | null
 }

@@ -99,12 +99,30 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updates: Partial<Project> = req.body;
 
+    // Validar status se fornecido
+    const validStatuses = ['backlog', 'todo', 'in_progress', 'review', 'done'];
+    if (updates.status && !validStatuses.includes(updates.status)) {
+      return res.status(400).json({ 
+        error: 'Invalid status',
+        message: `Status must be one of: ${validStatuses.join(', ')}`
+      });
+    }
+
+    // Preparar update apenas com campos válidos
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.description !== undefined) updateData.description = updates.description;
+    if (updates.status !== undefined) updateData.status = updates.status;
+    if (updates.github_url !== undefined) updateData.github_url = updates.github_url;
+    if (updates.github_owner !== undefined) updateData.github_owner = updates.github_owner;
+    if (updates.github_repo !== undefined) updateData.github_repo = updates.github_repo;
+
     const { data, error } = await supabase
       .from('projects')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
