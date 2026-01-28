@@ -1,2 +1,161 @@
-# CDT-Inteligencia
+# CDT-Inteligência
+
 Central de Tarefas do Departamento de Inteligência da Flexibase
+
+## 📋 Sobre o Projeto
+
+Sistema de gerenciamento de tarefas e projetos desenvolvido para o Departamento de Inteligência. Inclui:
+
+- **Sidebar Padronizada**: Menu lateral seguindo as especificações do Achromatic (shadcn/ui)
+- **Kanban Board**: Sistema de gerenciamento visual de projetos com drag-and-drop
+- **Integração GitHub**: Preparado para integração com GitHub API (commits, repositórios, contribuidores)
+- **Backend API**: API RESTful com Node.js/Express/TypeScript
+- **Banco de Dados**: Supabase para armazenamento de dados
+
+## 🚀 Tecnologias
+
+### Frontend
+- React 18 + TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- @dnd-kit (drag-and-drop)
+- React Router
+
+### Backend
+- Node.js + Express
+- TypeScript
+- Supabase Client
+- Octokit (GitHub API)
+
+## 📦 Instalação
+
+### Pré-requisitos
+- Node.js 18+ e npm
+- Conta no Supabase
+- (Opcional) Token de acesso pessoal do GitHub
+
+### Passos
+
+1. **Clone o repositório**
+```bash
+git clone https://github.com/JuanDalvit1/CDT-Inteligencia.git
+cd CDT-Inteligencia
+```
+
+2. **Instale as dependências**
+```bash
+npm run install:all
+```
+
+3. **Configure o banco de dados Supabase**
+   - Acesse o [Supabase Dashboard](https://app.supabase.com)
+   - Vá em **SQL Editor**
+   - Abra o arquivo `supabase-schema.sql` deste projeto
+   - Copie e cole todo o conteúdo no SQL Editor
+   - Clique em **Run** para executar o script
+   - Verifique se todas as tabelas foram criadas em **Table Editor**
+
+4. **Configure as variáveis de ambiente**
+
+Crie um arquivo `.env` na raiz do projeto:
+```env
+VITE_API_URL=http://localhost:3001
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+```
+
+Crie um arquivo `backend/.env`:
+```env
+SUPABASE_URL=sua_url_do_supabase
+SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+SUPABASE_SERVICE_ROLE_KEY=sua_chave_service_role_do_supabase
+GITHUB_TOKEN=seu_token_github_opcional
+PORT=3001
+FRONTEND_URL=http://localhost:3000
+```
+
+4. **Configure o banco de dados**
+
+Acesse o Supabase Dashboard > SQL Editor e execute o script completo do arquivo `supabase-schema.sql`. Isso criará todas as tabelas necessárias (`projects`, `tasks`, `comments`, `project_assignments`, `github_repositories`) com índices e triggers.
+
+5. **Execute o projeto**
+```bash
+npm run dev
+```
+
+Isso iniciará:
+- Backend na porta 3001
+- Frontend na porta 3000
+
+Acesse `http://localhost:3000` no navegador.
+
+## 📁 Estrutura do Projeto
+
+```
+CDT-Inteligencia/
+├── backend/                 # Backend Node.js/Express
+│   ├── src/
+│   │   ├── routes/         # Rotas da API
+│   │   ├── services/       # Lógica de negócio
+│   │   ├── config/         # Configurações
+│   │   └── types/          # TypeScript types
+│   └── package.json
+├── frontend/               # Frontend React
+│   ├── src/
+│   │   ├── components/    # Componentes React
+│   │   │   ├── sidebar/   # Componentes da sidebar
+│   │   │   ├── kanban/    # Componentes do Kanban
+│   │   │   └── ui/        # Componentes shadcn/ui
+│   │   ├── pages/         # Páginas da aplicação
+│   │   ├── hooks/         # React hooks customizados
+│   │   └── lib/           # Utilitários
+│   └── package.json
+├── SUPABASE_SCHEMA.md      # Documentação do schema
+├── supabase-schema.sql     # Script SQL para criar as tabelas
+└── package.json           # Workspace root
+```
+
+## 🎨 Funcionalidades
+
+### Sidebar
+- Largura: 240px (expandido) / 56px (colapsado)
+- Altura dos itens de menu: 36px
+- Padding de grupos configurado
+- Suporte a tooltips quando colapsado
+- Responsivo para mobile
+
+### Kanban Board
+- 5 colunas: Backlog, To Do, In Progress, Review, Done
+- Drag-and-drop entre colunas
+- Cards de projeto com informações do GitHub
+- Modal de detalhes do projeto
+- Criação de novos projetos
+
+### Integração GitHub (Preparada)
+- Estrutura pronta para buscar informações de repositórios
+- Lista de commits recentes
+- Contribuidores do repositório
+- Requer token GitHub configurado
+
+## 🔧 Scripts Disponíveis
+
+- `npm run dev` - Inicia frontend e backend simultaneamente
+- `npm run build` - Build de produção
+- `npm run install:all` - Instala dependências de todos os workspaces
+
+## 📝 Próximos Passos
+
+1. Configurar autenticação com Supabase Auth
+2. Implementar sistema de comentários
+3. Adicionar atribuições de usuários
+4. Expandir sidebar com novos departamentos/projetos
+5. Implementar notificações de atividades
+
+## 🤝 Contribuindo
+
+Este é um projeto interno do Departamento de Inteligência da Flexibase.
+
+## 📄 Licença
+
+Proprietário - Flexibase
