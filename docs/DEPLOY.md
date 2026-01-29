@@ -17,6 +17,25 @@ pm2 start "npm run dev:server" --name CDT
 
 O Nginx aponta para a porta **8088** (frontend). O Vite faz proxy de `/api` para o backend (porta 3002).
 
+**WebSocket (HMR)** – Para o hot-reload funcionar quando você acessa por um domínio (ex.: https://cdt.flexibase.com), o Nginx precisa repassar o WebSocket e o Vite precisa saber o host público. No servidor, adicione no `.env.local` (ou exporte antes de rodar):
+
+```
+VITE_HMR_HOST=cdt.flexibase.com
+VITE_HMR_PROTOCOL=wss
+VITE_HMR_CLIENT_PORT=443
+```
+
+Assim o browser conecta o WebSocket em `wss://cdt.flexibase.com` em vez de `ws://localhost:8088`.
+
+No Nginx, inclua no `location /` que faz proxy para a 8088:
+
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_set_header Host $host;
+```
+
 ---
 
 ## Opção 2: Modo produção (build compilado)

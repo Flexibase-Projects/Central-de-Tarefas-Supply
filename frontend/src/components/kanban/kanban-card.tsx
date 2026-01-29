@@ -7,8 +7,7 @@ import { useGitHub } from '@/hooks/use-github'
 import { useTodos } from '@/hooks/use-todos'
 import { useUsersList } from '@/hooks/use-users-list'
 import { CheckSquare2, User, CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react'
-
-const API_URL = import.meta.env.VITE_API_URL || ''
+import { getApiBase } from '@/lib/api'
 
 interface KanbanCardProps {
   project: Project
@@ -47,9 +46,10 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
       setOnline(null)
       return
     }
-    const url = API_URL ? `${API_URL}/api/projects/health-check?url=${encodeURIComponent(project.project_url)}` : `/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`
+    const base = getApiBase()
+    const url = base ? `${base}/api/projects/health-check?url=${encodeURIComponent(project.project_url)}` : `/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`
     fetch(url)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : { ok: false }))
       .then((d) => setOnline(d.ok === true))
       .catch(() => setOnline(false))
   }, [project.project_url])
@@ -60,11 +60,12 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
       return
     }
     setVersionCheck((v) => ({ ...v, loading: true }))
-    const url = API_URL
-      ? `${API_URL}/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`
+    const base = getApiBase()
+    const url = base
+      ? `${base}/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`
       : `/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`
     fetch(url)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : {}))
       .then((d) => setVersionCheck({ upToDate: d.upToDate ?? null, loading: false, reason: d.reason }))
       .catch(() => setVersionCheck({ upToDate: null, loading: false, reason: 'fetch_error' }))
   }, [project.project_url, project.github_url])

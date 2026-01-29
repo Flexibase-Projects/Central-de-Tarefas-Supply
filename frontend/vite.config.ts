@@ -16,6 +16,15 @@ export default defineConfig({
     port: Number(process.env.VITE_PORT) || 3003,
     // Host: 0.0.0.0 para aceitar conexões externas (servidor)
     host: process.env.VITE_HOST || 'localhost',
+    allowedHosts: ['cdt.flexibase.com'],
+    // HMR atrás de proxy: browser deve conectar ao host público, não localhost
+    hmr: process.env.VITE_HMR_HOST
+      ? {
+          host: process.env.VITE_HMR_HOST,
+          protocol: (process.env.VITE_HMR_PROTOCOL as 'ws' | 'wss') || 'wss',
+          clientPort: process.env.VITE_HMR_CLIENT_PORT ? Number(process.env.VITE_HMR_CLIENT_PORT) : undefined,
+        }
+      : true,
     proxy: {
       '/api': {
         target: `http://localhost:${process.env.BACKEND_PORT || 3002}`,
