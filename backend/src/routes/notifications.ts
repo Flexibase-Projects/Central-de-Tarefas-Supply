@@ -41,12 +41,12 @@ async function cleanupOrphanedNotifications() {
       return;
     }
 
-    const existingTodoIds = new Set(existingTodos?.map(t => t.id) || []);
+    const existingTodoIds = new Set(existingTodos?.map((t: { id: string }) => t.id) || []);
 
     // Encontrar notificações órfãs
     const orphanedNotificationIds = todoNotifications
-      .filter(n => n.related_id && !existingTodoIds.has(n.related_id))
-      .map(n => n.id);
+      .filter((n: { related_id: string | null }) => n.related_id && !existingTodoIds.has(n.related_id))
+      .map((n: { id: string }) => n.id);
 
     if (orphanedNotificationIds.length > 0) {
       // Deletar notificações órfãs

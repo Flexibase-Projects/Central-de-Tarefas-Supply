@@ -206,9 +206,9 @@ export async function getContributors(owner: string, repo: string): Promise<GitH
   try {
     const { data } = await octokitInstance.repos.listContributors({ owner, repo });
     return data.map((contributor) => ({
-      login: contributor.login,
-      avatar_url: contributor.avatar_url,
-      contributions: contributor.contributions,
+      login: contributor.login ?? '',
+      avatar_url: contributor.avatar_url ?? '',
+      contributions: contributor.contributions ?? 0,
     }));
   } catch (error: any) {
     const status = error?.status ?? error?.response?.status;

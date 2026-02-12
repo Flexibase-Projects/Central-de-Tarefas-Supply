@@ -8,10 +8,11 @@ export function isSupabaseConnectionRefused(error: unknown): boolean {
   const details = e?.details ?? '';
   const detailsStr = typeof details === 'string' ? details : String(details);
   const cause = e?.cause as Record<string, unknown> | undefined;
+  const causeRefused = cause && (cause.code === 'ECONNREFUSED' || cause.errno === 'ECONNREFUSED');
   return (
     message.includes('fetch failed') ||
     detailsStr.includes('ECONNREFUSED') ||
-    (cause && (cause.code === 'ECONNREFUSED' || cause.errno === 'ECONNREFUSED'))
+    Boolean(causeRefused)
   );
 }
 

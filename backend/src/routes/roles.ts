@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
 
     // Para cada role, buscar suas permissões
     const rolesWithPermissions = await Promise.all(
-      (roles || []).map(async (role) => {
+      (roles || []).map(async (role: Role) => {
         const { data: permissions } = await supabase
           .from('cdt_role_permissions')
           .select(`

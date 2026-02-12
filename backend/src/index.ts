@@ -86,12 +86,12 @@ async function initializeCleanup() {
       return;
     }
 
-    const existingTodoIds = new Set(existingTodos?.map(t => t.id) || []);
+    const existingTodoIds = new Set(existingTodos?.map((t: { id: string }) => t.id) || []);
 
     // Encontrar notificações órfãs
     const orphanedNotificationIds = todoNotifications
-      .filter(n => n.related_id && !existingTodoIds.has(n.related_id))
-      .map(n => n.id);
+      .filter((n: { related_id: string | null }) => n.related_id && !existingTodoIds.has(n.related_id))
+      .map((n: { id: string }) => n.id);
 
     if (orphanedNotificationIds.length > 0) {
       // Deletar notificações órfãs
@@ -182,8 +182,9 @@ async function logStartupStatus() {
   }
   const hasGitHubToken = process.env.GITHUB_TOKEN;
   if (hasGitHubToken) {
+    const token: string = hasGitHubToken;
     console.log('✅ GitHub token configured - GitHub API operations enabled');
-    console.log(`   Token: ${process.env.GITHUB_TOKEN.substring(0, 7)}...${process.env.GITHUB_TOKEN.substring(process.env.GITHUB_TOKEN.length - 4)}`);
+    console.log(`   Token: ${token.substring(0, 7)}...${token.substring(token.length - 4)}`);
   } else {
     console.warn('⚠️  GitHub token not configured - GitHub API operations will be limited');
     console.warn('⚠️  Add GITHUB_TOKEN to backend/.env.local to enable full GitHub integration');

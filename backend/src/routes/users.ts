@@ -56,7 +56,7 @@ router.get('/', async (req, res) => {
 
     // Para cada usuário, buscar seu cargo
     const usersWithRoles = await Promise.all(
-      (users || []).map(async (user) => {
+      (users || []).map(async (user: User) => {
         const { data: userRole } = await supabase
           .from('cdt_user_roles')
           .select(`

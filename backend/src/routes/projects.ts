@@ -116,7 +116,7 @@ router.get('/version-check', async (req, res) => {
         if (!r.ok) continue;
         const contentType = r.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
-          const body = await r.json().catch(() => ({}));
+          const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
           const raw = body.commit ?? body.sha ?? body.version ?? body.git_commit ?? body.buildId ?? null;
           if (raw && typeof raw === 'string') {
             deployedSha = raw.length >= 7 ? raw.substring(0, 7) : raw;
