@@ -9,7 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || '';
  * Não requer permissão admin
  */
 export function useUsersList() {
-  const { currentUser } = useAuth();
+  const { currentUser, getAuthHeaders } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,11 +18,8 @@ export function useUsersList() {
     try {
       setLoading(true);
       setError(null);
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users?for_assignment=true&userId=${userId}`, {
-        headers: {
-          'x-user-id': userId,
-        },
+      const response = await fetch(`${API_URL}/api/users?for_assignment=true`, {
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -37,7 +34,7 @@ export function useUsersList() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getAuthHeaders]);
 
   useEffect(() => {
     if (currentUser) {

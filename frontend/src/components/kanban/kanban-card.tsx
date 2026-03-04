@@ -1,235 +1,296 @@
-import { useState, useEffect } from 'react'
-import { Project } from '@/types'
-import { cn } from '@/lib/utils'
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { useGitHub } from '@/hooks/use-github'
-import { useTodos } from '@/hooks/use-todos'
-import { useUsersList } from '@/hooks/use-users-list'
-import { CheckSquare2, User, CheckCircle2, AlertTriangle, HelpCircle } from 'lucide-react'
-import { getApiBase } from '@/lib/api'
+import { useState, useEffect } from 'react';
+import { Project } from '@/types';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Card, CardContent, Box, Typography } from '@mui/material';
+import { CheckCircle, Warning, Help, Person, CheckBox } from '@mui/icons-material';
+
+function GitHubIconSmall() {
+  const size = 12;
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size} style={{ display: 'block' }}>
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+import { useGitHub } from '@/hooks/use-github';
+import { useTodos } from '@/hooks/use-todos';
+import { useUsersList } from '@/hooks/use-users-list';
+import { getApiBase } from '@/lib/api';
 
 interface KanbanCardProps {
-  project: Project
-  onClick?: () => void
+  project: Project;
+  onClick?: () => void;
 }
 
-export function KanbanCard({ project, onClick }: KanbanCardProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: project.id })
+// Paleta mínima: barra lateral fina por status (tons suaves)
+const STATUS_STRIPE: Record<string, string> = {
+  backlog: '#94a3b8',
+  todo: '#3b82f6',
+  in_progress: '#f59e0b',
+  review: '#8b5cf6',
+  done: '#10b981',
+};
 
-  const { getCommitsCount } = useGitHub()
-  const { todos } = useTodos(project.id)
-  const { users } = useUsersList()
-  const [commitsCount, setCommitsCount] = useState<number | null>(null)
-  const [online, setOnline] = useState<boolean | null>(null)
-  const [versionCheck, setVersionCheck] = useState<{ upToDate: boolean | null; loading: boolean; reason?: string }>({ upToDate: null, loading: false })
+export function KanbanCard({ project, onClick }: KanbanCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: project.id });
+  const { getCommitsCount } = useGitHub();
+  const { todos } = useTodos(project.id);
+  const { users } = useUsersList();
+  const [commitsCount, setCommitsCount] = useState<number | null>(null);
+  const [online, setOnline] = useState<boolean | null>(null);
+  const [versionCheck, setVersionCheck] = useState<{
+    upToDate: boolean | null;
+    loading: boolean;
+    reason?: string;
+  }>({ upToDate: null, loading: false });
 
   useEffect(() => {
     if (project.github_url) {
       getCommitsCount(project.github_url)
         .then(setCommitsCount)
-        .catch(() => setCommitsCount(0))
+        .catch(() => setCommitsCount(0));
     } else {
-      setCommitsCount(0)
+      setCommitsCount(0);
     }
-  }, [project.github_url, getCommitsCount])
+  }, [project.github_url, getCommitsCount]);
 
   useEffect(() => {
     if (!project.project_url) {
-      setOnline(null)
-      return
+      setOnline(null);
+      return;
     }
-    const base = getApiBase()
-    const url = base ? `${base}/api/projects/health-check?url=${encodeURIComponent(project.project_url)}` : `/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`
+    const base = getApiBase();
+    const url = base
+      ? `${base}/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`
+      : `/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`;
     fetch(url)
       .then((r) => (r.ok ? r.json() : { ok: false }))
       .then((d) => setOnline(d.ok === true))
-      .catch(() => setOnline(false))
-  }, [project.project_url])
+      .catch(() => setOnline(false));
+  }, [project.project_url]);
 
   useEffect(() => {
     if (!project.project_url || !project.github_url) {
-      setVersionCheck({ upToDate: null, loading: false })
-      return
+      setVersionCheck({ upToDate: null, loading: false });
+      return;
     }
-    setVersionCheck((v) => ({ ...v, loading: true }))
-    const base = getApiBase()
+    setVersionCheck((v) => ({ ...v, loading: true }));
+    const base = getApiBase();
     const url = base
       ? `${base}/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`
-      : `/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`
+      : `/api/projects/version-check?projectUrl=${encodeURIComponent(project.project_url)}&githubUrl=${encodeURIComponent(project.github_url)}`;
     fetch(url)
       .then((r) => (r.ok ? r.json() : {}))
-      .then((d: { upToDate?: boolean | null; reason?: string }) => setVersionCheck({ upToDate: d.upToDate ?? null, loading: false, reason: d.reason }))
-      .catch(() => setVersionCheck({ upToDate: null, loading: false, reason: 'fetch_error' }))
-  }, [project.project_url, project.github_url])
+      .then((d: { upToDate?: boolean | null; reason?: string }) =>
+        setVersionCheck({ upToDate: d.upToDate ?? null, loading: false, reason: d.reason })
+      )
+      .catch(() => setVersionCheck({ upToDate: null, loading: false, reason: 'fetch_error' }));
+  }, [project.project_url, project.github_url]);
 
-  // Filtrar TODOs pendentes e agrupar por responsável
-  const pendingTodos = todos.filter(todo => !todo.completed)
-  const todosByAssignee = pendingTodos.reduce((acc, todo) => {
-    const assigneeId = todo.assigned_to || 'unassigned'
-    if (!acc[assigneeId]) {
-      acc[assigneeId] = []
-    }
-    acc[assigneeId].push(todo)
-    return acc
-  }, {} as Record<string, typeof pendingTodos>)
-
-  // Criar lista de responsáveis com suas contagens
+  const pendingTodos = todos.filter((t) => !t.completed);
+  const todosByAssignee = pendingTodos.reduce(
+    (acc, todo) => {
+      const id = todo.assigned_to || 'unassigned';
+      if (!acc[id]) acc[id] = [];
+      acc[id].push(todo);
+      return acc;
+    },
+    {} as Record<string, typeof pendingTodos>
+  );
   const assigneesWithCounts = Object.entries(todosByAssignee)
-    .map(([assigneeId, todos]) => {
-      const user = assigneeId !== 'unassigned' ? users.find(u => u.id === assigneeId) : null
-      return {
-        assigneeId,
-        count: todos.length,
-        userName: user?.name || 'Sem responsável',
-      }
+    .map(([assigneeId, list]) => {
+      const user = assigneeId !== 'unassigned' ? users.find((u) => u.id === assigneeId) : null;
+      return { assigneeId, count: list.length, userName: user?.name || 'Sem responsável' };
     })
-    .sort((a, b) => b.count - a.count) // Ordenar por quantidade (maior primeiro)
+    .sort((a, b) => b.count - a.count);
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const displayNumber = commitsCount !== null ? commitsCount : 0;
+  const stripeColor = STATUS_STRIPE[project.status] || STATUS_STRIPE.backlog;
 
-  const statusColors = {
-    backlog: 'bg-muted/50 border-border',
-    todo: 'bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-800',
-    in_progress: 'bg-yellow-50 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-800',
-    review: 'bg-purple-50 dark:bg-purple-950/20 border-purple-300 dark:border-purple-800',
-    done: 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800',
-  }
+  const dotColor =
+    !project.project_url ? '#cbd5e1' : online === true ? '#10b981' : online === false ? '#ef4444' : '#cbd5e1';
 
-  const priorityBadgeColors = {
-    backlog: 'bg-muted-foreground/20 text-muted-foreground border-muted-foreground/30',
-    todo: 'bg-blue-500 text-white border-blue-600',
-    in_progress: 'bg-yellow-500 text-white border-yellow-600',
-    review: 'bg-purple-500 text-white border-purple-600',
-    done: 'bg-green-500 text-white border-green-600',
-  }
-
-  // Usar total de commits ou 0 se não houver GitHub URL
-  const displayNumber = commitsCount !== null ? commitsCount : 0
-
-  // Bolinha à esquerda: verde = online, vermelho = offline, cinza = sem link (cor fixa)
-  const statusDotClass =
-    !project.project_url
-      ? 'bg-muted-foreground/30 border-muted-foreground/40'
-      : online === true
-        ? 'bg-green-500 border-green-600'
-        : online === false
-          ? 'bg-red-500 border-red-600'
-          : 'bg-muted-foreground/40 border-muted-foreground/50'
+  const versionTitle =
+    versionCheck.reason === 'timeout'
+      ? 'Timeout ao acessar o site.'
+      : versionCheck.reason === 'no_version_found'
+        ? 'Nenhuma versão encontrada na página.'
+        : versionCheck.reason === 'fetch_error'
+          ? 'Erro ao acessar o site.'
+          : 'Não foi possível validar a versão';
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className={cn(
-        'group cursor-grab active:cursor-grabbing rounded-lg border-2 p-4 shadow-sm transition-all hover:shadow-md relative',
-        statusColors[project.status],
-        isDragging && 'opacity-0'
-      )}
+      variant="outlined"
+      sx={{
+        cursor: 'grab',
+        '&:active': { cursor: 'grabbing' },
+        position: 'relative',
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        opacity: isDragging ? 0.5 : 1,
+        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+        '&:hover': {
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          borderColor: 'action.selected',
+        },
+        overflow: 'visible',
+      }}
     >
-      {/* Bolinha: verde = online, vermelho = offline */}
-      <div
-        className={cn(
-          'absolute -top-1.5 -left-1.5 h-3 w-3 rounded-full border border-background z-10',
-          statusDotClass
-        )}
-        title={project.project_url ? (online === true ? 'Online' : online === false ? 'Offline' : 'Verificando...') : 'Link não configurado'}
+      {/* Barra de status (indicador visual discreto) */}
+      <Box
+        sx={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          borderRight: '1px solid',
+          borderColor: 'divider',
+          bgcolor: stripeColor,
+          borderRadius: '8px 0 0 8px',
+        }}
       />
-      {/* Badge com total de commits */}
+      {/* Indicador online/offline */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 10,
+          left: 14,
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          bgcolor: dotColor,
+          border: '1.5px solid',
+          borderColor: 'background.paper',
+          boxShadow: 1,
+          zIndex: 1,
+        }}
+        title={
+          project.project_url
+            ? online === true
+              ? 'Online'
+              : online === false
+                ? 'Offline'
+                : 'Verificando...'
+            : 'Link não configurado'
+        }
+      />
+      {/* Badge commits (discreto) */}
       {project.github_url && (
-        <div className={cn(
-          'absolute -top-2 -right-2 h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md border-2 border-background z-10',
-          priorityBadgeColors[project.status]
-        )}>
-          {commitsCount !== null ? String(displayNumber).padStart(2, '0') : '--'}
-        </div>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+            height: 20,
+            px: 1,
+            borderRadius: 1,
+            bgcolor: 'action.hover',
+            border: '1px solid',
+            borderColor: 'divider',
+            color: 'text.secondary',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}>
+            <GitHubIconSmall />
+          </Box>
+          <Typography component="span" variant="caption" fontWeight={600} sx={{ fontSize: 11, lineHeight: 1 }}>
+            {commitsCount !== null ? String(displayNumber).padStart(2, '0') : '--'}
+          </Typography>
+        </Box>
       )}
-
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm truncate">{project.name}</h3>
-          <div className="h-px bg-border mt-2 mb-2" />
-          {project.project_url && project.github_url && (
-            <div className="flex items-center gap-1.5 text-xs mt-1.5">
-              {versionCheck.loading ? (
-                <span className="text-muted-foreground">Verificando versão...</span>
-              ) : versionCheck.upToDate === true ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-500 shrink-0" />
-                  <span className="text-green-700 dark:text-green-400 font-medium">Atualizado — Última versão</span>
-                </>
-              ) : versionCheck.upToDate === false ? (
-                <>
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-500 shrink-0" />
-                  <span className="text-amber-700 dark:text-amber-400 font-medium">Desatualizado — Atualize o deploy</span>
-                </>
-              ) : (
-                <>
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span
-                    className="text-muted-foreground font-medium"
-                    title={
-                      versionCheck.reason === 'timeout'
-                        ? 'Timeout ao acessar o site. O sistema em produção não expõe a versão. Para habilitar a verificação, adicione um endpoint ou meta tag — veja docs/VERSIONAMENTO_DEPLOY.md'
-                        : versionCheck.reason === 'no_version_found'
-                          ? 'Nenhuma versão encontrada na página. Para habilitar a verificação, adicione um endpoint ou meta tag — veja docs/VERSIONAMENTO_DEPLOY.md'
-                          : versionCheck.reason === 'fetch_error'
-                            ? 'Erro ao acessar o site. Para habilitar a verificação, adicione um endpoint ou meta tag — veja docs/VERSIONAMENTO_DEPLOY.md'
-                            : 'O sistema em produção não expõe a versão. Para habilitar a verificação, adicione um endpoint ou meta tag — veja docs/VERSIONAMENTO_DEPLOY.md'
-                    }
-                  >
-                    Não foi possível validar a versão
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-          {project.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {project.description}
-            </p>
-          )}
-           {pendingTodos.length > 0 && (
-             <div className="flex flex-col gap-1.5 mt-2">
-               {assigneesWithCounts.map((assignee) => (
-                 <div
-                   key={assignee.assigneeId}
-                   className="relative flex items-center gap-2 px-2 py-1 rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800"
-                 >
-                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                     <CheckSquare2 className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400 shrink-0" />
-                     <span className="text-xs font-medium text-orange-700 dark:text-orange-300 whitespace-nowrap">
-                       {assignee.count} pendente{assignee.count !== 1 ? 's' : ''}
-                     </span>
-                   </div>
-                   <span className="absolute left-1/2 -translate-x-1/2 text-xs text-orange-600 dark:text-orange-400 pointer-events-none px-3 opacity-20">
-                     •
-                   </span>
-                   <div className="flex items-center gap-1 min-w-0 flex-1 justify-start">
-                     <User className="h-3 w-3 text-orange-600 dark:text-orange-400 shrink-0" />
-                     <span className="text-xs font-medium text-orange-700 dark:text-orange-300 truncate">
-                       {assignee.userName}
-                     </span>
-                   </div>
-                 </div>
-               ))}
-             </div>
-           )}
-        </div>
-      </div>
-    </div>
-  )
+      <CardContent sx={{ pl: 2.5, py: 1.5, pr: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Typography variant="subtitle2" fontWeight={600} noWrap sx={{ pr: project.github_url ? 5 : 0 }}>
+          {project.name}
+        </Typography>
+        {project.description && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              mt: 0.25,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              lineHeight: 1.35,
+            }}
+          >
+            {project.description}
+          </Typography>
+        )}
+        {project.project_url && project.github_url && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+            {versionCheck.loading ? (
+              <Typography variant="caption" color="text.secondary">
+                Verificando versão...
+              </Typography>
+            ) : versionCheck.upToDate === true ? (
+              <>
+                <CheckCircle sx={{ fontSize: 14, color: '#10b981' }} />
+                <Typography variant="caption" color="text.secondary">
+                  Atualizado
+                </Typography>
+              </>
+            ) : versionCheck.upToDate === false ? (
+              <>
+                <Warning sx={{ fontSize: 14, color: '#f59e0b' }} />
+                <Typography variant="caption" color="text.secondary">
+                  Desatualizado
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Help sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" title={versionTitle}>
+                  Versão não verificada
+                </Typography>
+              </>
+            )}
+          </Box>
+        )}
+        {pendingTodos.length > 0 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
+            {assigneesWithCounts.map((a) => (
+              <Box
+                key={a.assigneeId}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1,
+                  py: 0.5,
+                  borderRadius: 1,
+                  bgcolor: 'action.hover',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <CheckBox sx={{ fontSize: 14, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary">
+                  {a.count} pendente{a.count !== 1 ? 's' : ''}
+                </Typography>
+                <Person sx={{ fontSize: 12, color: 'text.secondary' }} />
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {a.userName}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

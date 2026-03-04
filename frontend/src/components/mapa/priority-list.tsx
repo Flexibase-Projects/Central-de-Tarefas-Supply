@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
+import { Box, Typography, Button } from '@mui/material'
 import { Project } from '@/types'
 import type { EisenhowerQuadrant } from '@/types'
 import { getProjectMapPosition } from '@/lib/map-position'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { cn } from '@/lib/utils'
 
 const QUADRANT_ORDER: EisenhowerQuadrant[] = [1, 2, 3, 4]
 
@@ -12,10 +11,6 @@ interface PriorityListProps {
   onProjectClick?: (project: Project) => void
 }
 
-/**
- * Lista de prioridade na ordem de Eisenhower: Q1 primeiro, depois Q2, Q3, Q4.
- * Projetos sem posição aparecem como Q1 (primeiro).
- */
 export function PriorityList({ projects, onProjectClick }: PriorityListProps) {
   const noPositionIndex = useMemo(() => {
     const arr = projects.filter(
@@ -39,42 +34,42 @@ export function PriorityList({ projects, onProjectClick }: PriorityListProps) {
 
   if (ordered.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <Typography variant="body2" color="text.secondary">
         Nenhum projeto. Arraste os projetos no mapa para definir prioridade.
-      </p>
+      </Typography>
     )
   }
 
   return (
-    <ScrollArea className="w-full whitespace-nowrap">
-      <div className="flex items-center gap-4 pb-2">
-        <span className="text-xs font-medium text-muted-foreground shrink-0">
+    <Box sx={{ width: '100%', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
+        <Typography variant="caption" fontWeight={500} color="text.secondary" sx={{ flexShrink: 0 }}>
           Ordem de prioridade (Eisenhower):
-        </span>
-        <ol className="flex flex-wrap items-center gap-2">
+        </Typography>
+        <Box component="ol" sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, listStyle: 'none', m: 0, p: 0 }}>
           {ordered.map((project, index) => (
-            <li key={project.id} className="inline-flex items-center gap-2">
-              <button
-                type="button"
+            <Box component="li" key={project.id} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              <Button
+                size="small"
                 onClick={() => onProjectClick?.(project)}
-                className={cn(
-                  'rounded-md px-2 py-1 text-sm font-medium transition-colors',
-                  'hover:bg-primary/15 hover:text-primary',
-                  'focus:outline-none focus:ring-2 focus:ring-ring'
-                )}
+                sx={{
+                  textTransform: 'none',
+                  minWidth: 'auto',
+                  px: 1,
+                  py: 0.5,
+                  '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+                }}
               >
-                <span className="text-muted-foreground mr-1">{index + 1}.</span>
+                <Typography component="span" variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>{index + 1}.</Typography>
                 {project.name}
-              </button>
+              </Button>
               {index < ordered.length - 1 && (
-                <span className="text-muted-foreground/60" aria-hidden>
-                  →
-                </span>
+                <Typography component="span" variant="body2" color="text.secondary" sx={{ opacity: 0.6 }} aria-hidden>→</Typography>
               )}
-            </li>
+            </Box>
           ))}
-        </ol>
-      </div>
-    </ScrollArea>
+        </Box>
+      </Box>
+    </Box>
   )
 }

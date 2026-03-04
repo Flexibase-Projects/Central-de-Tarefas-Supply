@@ -1,191 +1,182 @@
-import { useState } from 'react';
-import { UserWithRole } from '@/types';
-import { useUsers } from '@/hooks/use-users';
-import { useRoles } from '@/hooks/use-roles';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState } from 'react'
 import {
+  Box,
+  Button,
+  TextField,
   Dialog,
-  DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+  DialogContent,
+  DialogActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  FormControl,
+  Select,
+  MenuItem,
+  IconButton,
+  Typography,
+  CircularProgress,
+  Chip,
+} from '@mui/material'
+import { Add, Edit, Delete } from '@mui/icons-material'
+import { UserWithRole } from '@/types'
+import { useUsers } from '@/hooks/use-users'
+import { useRoles } from '@/hooks/use-roles'
 
 export function UsersTable() {
-  const { users, loading, createUser, updateUser, deleteUser, assignRole } = useUsers();
-  const { roles } = useRoles();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
-  const [formData, setFormData] = useState({ email: '', name: '', avatar_url: '' });
+  const { users, loading, createUser, updateUser, deleteUser, assignRole } = useUsers()
+  const { roles } = useRoles()
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null)
+  const [formData, setFormData] = useState({ email: '', name: '', avatar_url: '' })
 
   const handleCreate = () => {
-    setEditingUser(null);
-    setFormData({ email: '', name: '', avatar_url: '' });
-    setIsDialogOpen(true);
-  };
+    setEditingUser(null)
+    setFormData({ email: '', name: '', avatar_url: '' })
+    setIsDialogOpen(true)
+  }
 
   const handleEdit = (user: UserWithRole) => {
-    setEditingUser(user);
+    setEditingUser(user)
     setFormData({
       email: user.email,
       name: user.name,
       avatar_url: user.avatar_url || '',
-    });
-    setIsDialogOpen(true);
-  };
+    })
+    setIsDialogOpen(true)
+  }
 
   const handleSubmit = async () => {
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, formData);
+        await updateUser(editingUser.id, formData)
       } else {
-        await createUser(formData);
+        await createUser(formData)
       }
-      setIsDialogOpen(false);
+      setIsDialogOpen(false)
     } catch (error) {
-      console.error('Error saving user:', error);
+      console.error('Error saving user:', error)
     }
-  };
+  }
 
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja desativar este usuário?')) {
-      await deleteUser(id);
+      await deleteUser(id)
     }
-  };
+  }
 
   const handleRoleChange = async (userId: string, roleId: string) => {
-    await assignRole(userId, roleId);
-  };
+    await assignRole(userId, roleId)
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+        <CircularProgress />
+      </Box>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-foreground">Usuários</h2>
-        <Button onClick={handleCreate} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6" fontWeight={600}>Usuários</Typography>
+        <Button variant="contained" size="small" onClick={handleCreate} startIcon={<Add />}>
           Novo Usuário
         </Button>
-      </div>
+      </Box>
 
-      <div className="rounded-lg border border-border bg-card shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="p-4 text-left text-sm font-semibold text-foreground">Nome</th>
-                <th className="p-4 text-left text-sm font-semibold text-foreground">Email</th>
-                <th className="p-4 text-left text-sm font-semibold text-foreground">Cargo</th>
-                <th className="p-4 text-left text-sm font-semibold text-foreground">Status</th>
-                <th className="p-4 text-right text-sm font-semibold text-foreground">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                    Nenhum usuário encontrado
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                    <td className="p-4 text-sm text-foreground font-medium">{user.name}</td>
-                    <td className="p-4 text-sm text-muted-foreground">{user.email}</td>
-                    <td className="p-4">
-                      <select
+      <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'action.hover' }}>
+              <TableCell sx={{ fontWeight: 600 }}>Nome</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Cargo</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>Ações</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">Nenhum usuário encontrado</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((user) => (
+                <TableRow key={user.id} hover>
+                  <TableCell sx={{ fontWeight: 500 }}>{user.name}</TableCell>
+                  <TableCell><Typography variant="body2" color="text.secondary">{user.email}</Typography></TableCell>
+                  <TableCell>
+                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                      <Select
                         value={user.role?.id || ''}
                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        displayEmpty
                       >
-                        <option value="">Sem cargo</option>
+                        <MenuItem value="">Sem cargo</MenuItem>
                         {roles.map((role) => (
-                          <option key={role.id} value={role.id}>
-                            {role.display_name}
-                          </option>
+                          <MenuItem key={role.id} value={role.id}>{role.display_name}</MenuItem>
                         ))}
-                      </select>
-                    </td>
-                    <td className="p-4">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        user.is_active 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
-                        {user.is_active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(user)} className="h-8 w-8 p-0">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)} className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      </Select>
+                    </FormControl>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={user.is_active ? 'Ativo' : 'Inativo'}
+                      size="small"
+                      color={user.is_active ? 'success' : 'error'}
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton size="small" onClick={() => handleEdit(user)}><Edit fontSize="small" /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => handleDelete(user.id)}><Delete fontSize="small" /></IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </Box>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="usuario@exemplo.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground">Nome</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Nome completo"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="avatar_url" className="text-foreground">Avatar URL (opcional)</Label>
-              <Input
-                id="avatar_url"
-                value={formData.avatar_url}
-                onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                placeholder="https://exemplo.com/avatar.jpg"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit}>Salvar</Button>
-          </DialogFooter>
+      <Dialog open={isDialogOpen} onClose={() => setIsDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="usuario@exemplo.com"
+              fullWidth
+            />
+            <TextField
+              label="Nome"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Nome completo"
+              fullWidth
+            />
+            <TextField
+              label="Avatar URL (opcional)"
+              value={formData.avatar_url}
+              onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
+              placeholder="https://exemplo.com/avatar.jpg"
+              fullWidth
+            />
+          </Box>
         </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSubmit}>Salvar</Button>
+        </DialogActions>
       </Dialog>
-    </div>
-  );
+    </Box>
+  )
 }

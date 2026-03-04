@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Activity } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
-// Use proxy if VITE_API_URL is not set, otherwise use the full URL
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 export function useActivities() {
+  const { getAuthHeaders } = useAuth()
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -13,7 +14,7 @@ export function useActivities() {
     try {
       setLoading(true)
       const url = API_URL ? `${API_URL}/api/activities` : '/api/activities'
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: getAuthHeaders() })
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`Failed to fetch activities: ${response.status} ${response.statusText} - ${errorText}`)
@@ -39,7 +40,7 @@ export function useActivities() {
       const url = API_URL ? `${API_URL}/api/activities` : '/api/activities'
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(activity),
       })
       
@@ -63,7 +64,7 @@ export function useActivities() {
       const url = API_URL ? `${API_URL}/api/activities/${id}` : `/api/activities/${id}`
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       })
       if (!response.ok) throw new Error('Failed to update activity')
@@ -82,6 +83,7 @@ export function useActivities() {
       const url = API_URL ? `${API_URL}/api/activities/${id}` : `/api/activities/${id}`
       const response = await fetch(url, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error('Failed to delete activity')
       setActivities(prev => prev.filter(a => a.id !== id))

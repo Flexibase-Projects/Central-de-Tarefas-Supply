@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import { DatePicker } from '@/components/ui/date-picker'
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Box,
+  Typography,
+} from '@mui/material'
 import { Activity } from '@/types'
 
 interface CreateActivityDialogProps {
@@ -19,17 +21,27 @@ interface CreateActivityDialogProps {
   onCreate: (activity: Partial<Activity>) => Promise<void>
 }
 
-export function CreateActivityDialog({
-  open,
-  onOpenChange,
-  onCreate,
-}: CreateActivityDialogProps) {
+const statusOptions: { value: Activity['status']; label: string }[] = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'To Do' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'done', label: 'Done' },
+]
+
+const priorityOptions: { value: Activity['priority']; label: string }[] = [
+  { value: 'low', label: 'Baixa' },
+  { value: 'medium', label: 'Média' },
+  { value: 'high', label: 'Alta' },
+]
+
+export function CreateActivityDialog({ open, onOpenChange, onCreate }: CreateActivityDialogProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     status: 'backlog' as Activity['status'],
     priority: 'medium' as Activity['priority'],
-    due_date: null as Date | null,
+    due_date: '' as string,
   })
   const [loading, setLoading] = useState(false)
 
@@ -39,24 +51,14 @@ export function CreateActivityDialog({
 
     setLoading(true)
     try {
-      const activityData = {
+      await onCreate({
         name: formData.name,
         description: formData.description || null,
         status: formData.status,
         priority: formData.priority,
-        due_date: formData.due_date ? formData.due_date.toISOString() : null,
-      }
-
-      await onCreate(activityData)
-      
-      // Reset form
-      setFormData({
-        name: '',
-        description: '',
-        status: 'backlog',
-        priority: 'medium',
-        due_date: null,
+        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
       })
+      setFormData({ name: '', description: '', status: 'backlog', priority: 'medium', due_date: '' })
       onOpenChange(false)
     } catch (error) {
       console.error('Error creating activity:', error)
@@ -67,87 +69,71 @@ export function CreateActivityDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Nova Atividade</DialogTitle>
-            <DialogDescription>
-              Crie uma nova atividade para gerenciar no Kanban
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome da Atividade *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Ex: Revisar documentação"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Breve descrição da atividade"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status Inicial</Label>
-              <select
-                id="status"
+    <Dialog open={open} onClose={() => onOpenChange(false)} maxWidth="sm" fullWidth>
+      <form onSubmit={handleSubmit}>
+        <DialogTitle>Nova Atividade</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Crie uma nova atividade para gerenciar no Kanban
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <TextField
+              label="Nome da Atividade *"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Ex: Revisar documentação"
+              required
+              fullWidth
+            />
+            <TextField
+              label="Descrição"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Breve descrição da atividade"
+              fullWidth
+              multiline
+            />
+            <FormControl fullWidth>
+              <InputLabel>Status Inicial</InputLabel>
+              <Select
                 value={formData.status}
+                label="Status Inicial"
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as Activity['status'] })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="backlog">Backlog</option>
-                <option value="todo">To Do</option>
-                <option value="in_progress">In Progress</option>
-                <option value="review">Review</option>
-                <option value="done">Done</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="priority">Prioridade</Label>
-              <select
-                id="priority"
+                {statusOptions.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Prioridade</InputLabel>
+              <Select
                 value={formData.priority}
+                label="Prioridade"
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value as Activity['priority'] })}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="low">Baixa</option>
-                <option value="medium">Média</option>
-                <option value="high">Alta</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label>Data de Vencimento</Label>
-              <DatePicker
-                value={formData.due_date}
-                onChange={(date) => setFormData({ ...formData, due_date: date || null })}
-                placeholder="Selecione a data de vencimento"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading || !formData.name.trim()}>
-              {loading ? 'Criando...' : 'Criar Atividade'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+                {priorityOptions.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Data de Vencimento"
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => onOpenChange(false)} disabled={loading}>Cancelar</Button>
+          <Button type="submit" variant="contained" disabled={loading || !formData.name.trim()}>
+            {loading ? 'Criando...' : 'Criar Atividade'}
+          </Button>
+        </DialogActions>
+      </form>
     </Dialog>
   )
 }

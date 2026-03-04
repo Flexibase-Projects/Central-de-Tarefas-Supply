@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export function useNotifications() {
-  const { currentUser } = useAuth();
+  const { currentUser, getAuthHeaders } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -19,11 +19,8 @@ export function useNotifications() {
 
     try {
       setLoading(true);
-      const userId = currentUser.id;
-      const response = await fetch(`${API_URL}/api/notifications?userId=${userId}`, {
-        headers: {
-          'x-user-id': userId,
-        },
+      const response = await fetch(`${API_URL}/api/notifications`, {
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -35,7 +32,7 @@ export function useNotifications() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getAuthHeaders]);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!currentUser) {
@@ -44,11 +41,8 @@ export function useNotifications() {
     }
 
     try {
-      const userId = currentUser.id;
-      const response = await fetch(`${API_URL}/api/notifications/unread-count?userId=${userId}`, {
-        headers: {
-          'x-user-id': userId,
-        },
+      const response = await fetch(`${API_URL}/api/notifications/unread-count`, {
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -75,12 +69,9 @@ export function useNotifications() {
 
   const markAsRead = async (id: string) => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/notifications/${id}/read?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/notifications/${id}/read`, {
         method: 'PUT',
-        headers: {
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -96,12 +87,9 @@ export function useNotifications() {
 
   const markAllAsRead = async () => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/notifications/read-all?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/notifications/read-all`, {
         method: 'PUT',
-        headers: {
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -115,12 +103,9 @@ export function useNotifications() {
 
   const deleteNotification = async (id: string) => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/notifications/${id}?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/notifications/${id}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {

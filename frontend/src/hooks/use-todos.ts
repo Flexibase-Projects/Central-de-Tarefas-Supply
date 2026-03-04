@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ProjectTodo } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 export function useTodos(projectId: string | null) {
+  const { getAuthHeaders } = useAuth()
   const [todos, setTodos] = useState<ProjectTodo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export function useTodos(projectId: string | null) {
       setLoading(true)
       setError(null)
       const url = API_URL ? `${API_URL}/api/todos/${projectId}` : `/api/todos/${projectId}`
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error('Failed to fetch todos')
       }
@@ -31,7 +33,7 @@ export function useTodos(projectId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, getAuthHeaders])
 
   useEffect(() => {
     fetchTodos()
@@ -42,7 +44,7 @@ export function useTodos(projectId: string | null) {
       const url = API_URL ? `${API_URL}/api/todos` : '/api/todos'
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(todo),
       })
       if (!response.ok) {
@@ -56,14 +58,14 @@ export function useTodos(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   const updateTodo = useCallback(async (id: string, updates: Partial<ProjectTodo>) => {
     try {
       const url = API_URL ? `${API_URL}/api/todos/${id}` : `/api/todos/${id}`
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       })
       if (!response.ok) {
@@ -77,13 +79,14 @@ export function useTodos(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   const deleteTodo = useCallback(async (id: string) => {
     try {
       const url = API_URL ? `${API_URL}/api/todos/${id}` : `/api/todos/${id}`
       const response = await fetch(url, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       })
       if (!response.ok) {
         throw new Error('Failed to delete todo')
@@ -94,7 +97,7 @@ export function useTodos(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   const reorderTodos = useCallback(async (todoIds: string[]) => {
     if (!projectId) return
@@ -103,7 +106,7 @@ export function useTodos(projectId: string | null) {
       const url = API_URL ? `${API_URL}/api/todos/reorder` : '/api/todos/reorder'
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           project_id: projectId,
           todo_ids: todoIds,

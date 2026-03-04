@@ -46,6 +46,7 @@ import permissionsRoutes from './routes/permissions.js';
 import rolesRoutes from './routes/roles.js';
 import usersRoutes from './routes/users.js';
 import notificationsRoutes from './routes/notifications.js';
+import { authMiddleware } from './middleware/auth.js';
 import { isSupabaseConnectionRefused, SUPABASE_UNAVAILABLE_MESSAGE } from './utils/supabase-errors.js';
 
 // Função para limpar notificações órfãs na inicialização
@@ -129,6 +130,9 @@ app.use(express.json());
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Autenticação: extrai usuário do JWT Supabase e define x-user-id
+app.use(authMiddleware);
 
 // Routes
 app.use('/api/projects', projectsRoutes);

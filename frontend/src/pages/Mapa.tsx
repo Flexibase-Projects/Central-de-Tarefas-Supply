@@ -1,9 +1,9 @@
 import { useState } from 'react'
+import { Box, CircularProgress, Typography, Paper } from '@mui/material'
 import { useProjects } from '@/hooks/use-projects'
 import { ProjectCardDialog } from '@/components/kanban/project-card-dialog'
 import { EisenhowerCanvas } from '@/components/mapa/eisenhower-canvas'
 import { PriorityList } from '@/components/mapa/priority-list'
-import { Loader2 } from 'lucide-react'
 import type { Project } from '@/types'
 
 export default function Mapa() {
@@ -30,34 +30,34 @@ export default function Mapa() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress size={40} />
+      </Box>
     )
   }
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
-        <p className="text-destructive">{error}</p>
-      </div>
+      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', p: 3 }}>
+        <Typography color="error">{error}</Typography>
+      </Box>
     )
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="shrink-0 border-b bg-card px-4 py-3">
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <Box sx={{ flexShrink: 0, borderBottom: 1, borderColor: 'divider', px: 2, py: 1.5 }}>
         <PriorityList projects={projects} onProjectClick={handleProjectClick} />
-      </div>
-      <div className="min-h-0 flex-1 p-2">
-        <div className="h-full overflow-hidden rounded-lg border bg-card">
+      </Box>
+      <Box sx={{ flex: 1, minHeight: 0, p: 1 }}>
+        <Paper variant="outlined" sx={{ height: '100%', overflow: 'hidden', borderRadius: 1 }}>
           <EisenhowerCanvas
-          projects={projects}
-          onProjectClick={handleProjectClick}
-          onPositionChange={handlePositionChange}
-        />
-        </div>
-      </div>
+            projects={projects}
+            onProjectClick={handleProjectClick}
+            onPositionChange={handlePositionChange}
+          />
+        </Paper>
+      </Box>
       <ProjectCardDialog
         project={selectedProject}
         open={dialogOpen}
@@ -68,6 +68,6 @@ export default function Mapa() {
         onUpdate={handleUpdate}
         onDelete={deleteProject}
       />
-    </div>
+    </Box>
   )
 }

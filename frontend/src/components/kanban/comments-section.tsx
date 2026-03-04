@@ -1,10 +1,9 @@
 import { useState } from 'react'
+import { Box, TextField, Button, Typography, Avatar, IconButton, CircularProgress } from '@mui/material'
+import { Send, Delete } from '@mui/icons-material'
 import { Comment } from '@/types'
 import { useProjectComments } from '@/hooks/use-project-comments'
 import { useAuth } from '@/contexts/AuthContext'
-import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
-import { Trash2, Send, Loader2, User } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
 interface CommentsSectionProps {
@@ -18,36 +17,23 @@ interface CommentItemProps {
 
 function CommentItem({ comment, onDelete }: CommentItemProps) {
   return (
-    <div className="flex gap-3 p-3 rounded-lg border bg-card">
-      <div className="flex-shrink-0">
-        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <User className="h-4 w-4 text-primary" />
-        </div>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium">
+    <Box sx={{ display: 'flex', gap: 1.5, p: 1.5, borderRadius: 1, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+      <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Typography variant="body2" fontWeight={500}>
             {comment.author_name || 'Usuário Anônimo'}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(comment.created_at), {
-              addSuffix: true,
-            })}
-          </span>
-        </div>
-        <p className="text-sm text-foreground whitespace-pre-wrap">
-          {comment.content}
-        </p>
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onDelete(comment.id)}
-        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-      >
-        <Trash2 className="h-3 w-3" />
-      </Button>
-    </div>
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+          </Typography>
+        </Box>
+        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography>
+      </Box>
+      <IconButton size="small" onClick={() => onDelete(comment.id)}>
+        <Delete sx={{ fontSize: 16 }} />
+      </IconButton>
+    </Box>
   )
 }
 
@@ -90,52 +76,46 @@ export function CommentsSection({ projectId }: CommentsSectionProps) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-2">
-        <Textarea
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+      <Box>
+        <TextField
+          multiline
+          minRows={3}
+          fullWidth
+          size="small"
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Escreva um comentário..."
-          className="min-h-[80px] resize-none"
+          sx={{ mb: 1 }}
         />
-        <div className="flex justify-end">
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
+            variant="contained"
+            size="small"
             onClick={handleSubmit}
             disabled={!newComment.trim() || isSubmitting}
-            size="sm"
+            startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <Send />}
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-2" />
-                Enviar
-              </>
-            )}
+            {isSubmitting ? 'Enviando...' : 'Enviar'}
           </Button>
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {loading ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={24} />
+        </Box>
       ) : comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
+        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
           Nenhum comentário ainda. Seja o primeiro a comentar!
-        </p>
+        </Typography>
       ) : (
-        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto' }}>
           {comments.map((comment) => (
-            <div key={comment.id} className="group">
-              <CommentItem comment={comment} onDelete={handleDelete} />
-            </div>
+            <CommentItem key={comment.id} comment={comment} onDelete={handleDelete} />
           ))}
-        </div>
+        </Box>
       )}
-    </div>
+    </Box>
   )
 }

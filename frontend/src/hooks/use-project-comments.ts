@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Comment } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
 export function useProjectComments(projectId: string | null) {
+  const { getAuthHeaders } = useAuth()
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +20,7 @@ export function useProjectComments(projectId: string | null) {
       setLoading(true)
       setError(null)
       const url = API_URL ? `${API_URL}/api/project-comments/${projectId}` : `/api/project-comments/${projectId}`
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: getAuthHeaders() })
       if (!response.ok) {
         throw new Error('Failed to fetch comments')
       }
@@ -31,7 +33,7 @@ export function useProjectComments(projectId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, getAuthHeaders])
 
   useEffect(() => {
     fetchComments()
@@ -42,7 +44,7 @@ export function useProjectComments(projectId: string | null) {
       const url = API_URL ? `${API_URL}/api/project-comments` : '/api/project-comments'
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(comment),
       })
       if (!response.ok) {
@@ -56,14 +58,14 @@ export function useProjectComments(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   const updateComment = useCallback(async (id: string, content: string) => {
     try {
       const url = API_URL ? `${API_URL}/api/project-comments/${id}` : `/api/project-comments/${id}`
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ content }),
       })
       if (!response.ok) {
@@ -77,13 +79,14 @@ export function useProjectComments(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   const deleteComment = useCallback(async (id: string) => {
     try {
       const url = API_URL ? `${API_URL}/api/project-comments/${id}` : `/api/project-comments/${id}`
       const response = await fetch(url, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       })
       if (!response.ok) {
         throw new Error('Failed to delete comment')
@@ -94,7 +97,7 @@ export function useProjectComments(projectId: string | null) {
       setError(errorMessage)
       throw err
     }
-  }, [])
+  }, [getAuthHeaders])
 
   return {
     comments,

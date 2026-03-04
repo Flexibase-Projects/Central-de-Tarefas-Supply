@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Box, CircularProgress, Fab, Typography } from '@mui/material'
+import { Add } from '@mui/icons-material'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ActivityCardDialog } from '@/components/kanban/activity-card-dialog'
 import { CreateActivityDialog } from '@/components/kanban/create-activity-dialog'
@@ -16,8 +16,7 @@ export default function Atividades() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
 
-  // Converter Activity para Project para usar com KanbanBoard (que espera Project)
-  const projectsAsActivities: Project[] = activities.map(activity => ({
+  const projectsAsActivities: Project[] = activities.map((activity) => ({
     id: activity.id,
     name: activity.name,
     description: activity.description,
@@ -32,8 +31,7 @@ export default function Atividades() {
   }))
 
   const handleProjectClick = (project: Project) => {
-    // Encontrar a atividade correspondente
-    const activity = activities.find(a => a.id === project.id)
+    const activity = activities.find((a) => a.id === project.id)
     if (activity) {
       setSelectedActivity(activity)
       setIsActivityDialogOpen(true)
@@ -69,40 +67,42 @@ export default function Atividades() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Carregando atividades...</div>
-      </div>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress />
+          <Typography color="text.secondary">Carregando atividades...</Typography>
+        </Box>
+      </Box>
     )
   }
 
   return (
     <ProtectedRoute permission="access_atividades">
-      <div className="h-full flex flex-col relative">
-        <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <Box sx={{ flex: 1, overflow: 'hidden', px: 3, pt: 2, pb: 3 }}>
           <KanbanBoard
             projects={projectsAsActivities}
             onProjectMove={handleProjectMove}
             onProjectClick={handleProjectClick}
           />
-        </div>
+        </Box>
 
-        {/* Botão flutuante */}
         <RequirePermission permission="move_card">
-          <Button
+          <Fab
+            color="primary"
+            aria-label="Nova Atividade"
             onClick={() => setIsCreateDialogOpen(true)}
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
-            size="icon"
+            sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
           >
-            <Plus className="h-6 w-6" />
-            <span className="sr-only">Nova Atividade</span>
-          </Button>
+            <Add />
+          </Fab>
         </RequirePermission>
 
-      <CreateActivityDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onCreate={handleCreateActivity}
-      />
+        <CreateActivityDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          onCreate={handleCreateActivity}
+        />
 
         <ActivityCardDialog
           activity={selectedActivity}
@@ -110,7 +110,7 @@ export default function Atividades() {
           onOpenChange={setIsActivityDialogOpen}
           onUpdate={handleUpdateActivity}
         />
-      </div>
+      </Box>
     </ProtectedRoute>
   )
 }

@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { Project } from '@/types'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
-// Use proxy if VITE_API_URL is not set, otherwise use the full URL
 const API_URL = import.meta.env.VITE_API_URL || ''
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || ''
+const REALTIME_ENABLED = import.meta.env.VITE_SUPABASE_REALTIME_ENABLED === 'true'
 
 export function useProjects() {
+  const { getAuthHeaders } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,7 +18,7 @@ export function useProjects() {
     try {
       setLoading(true)
       const url = API_URL ? `${API_URL}/api/projects` : '/api/projects'
-      const response = await fetch(url)
+      const response = await fetch(url, { headers: getAuthHeaders() })
       if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`Failed to fetch projects: ${response.status} ${response.statusText} - ${errorText}`)
@@ -37,9 +39,9 @@ export function useProjects() {
     fetchProjects()
   }, [])
 
-  // Atualização em tempo real: quando alguém move um card (ou edita projeto), todos os clientes atualizam
+  // Atualização em tempo real (opcional): só conecta se VITE_SUPABASE_REALTIME_ENABLED=true
   useEffect(() => {
-    if (!SUPABASE_URL) return
+    if (!SUPABASE_URL || !REALTIME_ENABLED) return
     const channel = supabase
       .channel('cdt_projects_realtime')
       .on(
@@ -71,7 +73,12 @@ export function useProjects() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          supabase.removeChannel(channel)
+          channelRef.current = null
+        }
+      })
     channelRef.current = channel
     return () => {
       supabase.removeChannel(channel)
@@ -84,7 +91,7 @@ export function useProjects() {
       const url = API_URL ? `${API_URL}/api/projects` : '/api/projects'
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(project),
       })
       
@@ -108,7 +115,7 @@ export function useProjects() {
       const url = API_URL ? `${API_URL}/api/projects/${id}` : `/api/projects/${id}`
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       })
       if (!response.ok) throw new Error('Failed to update project')
@@ -134,7 +141,7 @@ export function useProjects() {
       const url = API_URL ? `${API_URL}/api/projects/${id}` : `/api/projects/${id}`
       const response = await fetch(url, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       })
       if (!response.ok) throw new Error('Failed to update project')
@@ -152,6 +159,7 @@ export function useProjects() {
       const url = API_URL ? `${API_URL}/api/projects/${id}` : `/api/projects/${id}`
       const response = await fetch(url, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       })
       if (!response.ok) throw new Error('Failed to delete project')
       setProjects(prev => prev.filter(p => p.id !== id))

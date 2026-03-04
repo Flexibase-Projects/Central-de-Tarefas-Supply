@@ -1,121 +1,124 @@
-import { useState, useEffect } from 'react';
-import { Permission, Role } from '@/types';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react'
+import { Box, Button, Typography, FormControlLabel, Checkbox, Paper, CircularProgress } from '@mui/material'
+import { Permission, Role } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 interface RolePermissionsEditorProps {
-  role: Role;
-  onSave: () => void;
+  role: Role
+  onSave: () => void
 }
 
 export function RolePermissionsEditor({ role, onSave }: RolePermissionsEditorProps) {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { getAuthHeaders } = useAuth()
+  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Buscar todas as permissões
-        const permsResponse = await fetch(`${API_URL}/api/permissions`);
+        const headers = getAuthHeaders();
+        const permsResponse = await fetch(`${API_URL}/api/permissions`, { headers })
         if (permsResponse.ok) {
-          const permsData = await permsResponse.json();
-          setPermissions(permsData);
+          const permsData = await permsResponse.json()
+          setPermissions(permsData)
         }
-
-        // Buscar permissões do cargo
-        const roleResponse = await fetch(`${API_URL}/api/roles/${role.id}`);
+        const roleResponse = await fetch(`${API_URL}/api/roles/${role.id}`, { headers })
         if (roleResponse.ok) {
-          const roleData = await roleResponse.json();
-          setSelectedPermissions((roleData.permissions || []).map((p: Permission) => p.id));
+          const roleData = await roleResponse.json()
+          setSelectedPermissions((roleData.permissions || []).map((p: Permission) => p.id))
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching data:', error)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-
-    fetchData();
-  }, [role.id]);
+    }
+    fetchData()
+  }, [role.id, getAuthHeaders])
 
   const handleTogglePermission = (permissionId: string) => {
     setSelectedPermissions((prev) =>
-      prev.includes(permissionId)
-        ? prev.filter((id) => id !== permissionId)
-        : [...prev, permissionId]
-    );
-  };
+      prev.includes(permissionId) ? prev.filter((id) => id !== permissionId) : [...prev, permissionId]
+    )
+  }
 
   const handleSave = async () => {
     try {
-      const userId = localStorage.getItem('cdt_user_id') || '';
-      const response = await fetch(`${API_URL}/api/roles/${role.id}/permissions?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/roles/${role.id}/permissions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ permission_ids: selectedPermissions }),
-      });
-
-      if (response.ok) {
-        onSave();
-      }
+      })
+      if (response.ok) onSave()
     } catch (error) {
-      console.error('Error saving permissions:', error);
+      console.error('Error saving permissions:', error)
     }
-  };
+  }
 
-  const groupedPermissions = permissions.reduce((acc, perm) => {
-    const category = perm.category || 'general';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(perm);
-    return acc;
-  }, {} as Record<string, Permission[]>);
+  const groupedPermissions = permissions.reduce(
+    (acc, perm) => {
+      const category = perm.category || 'general'
+      if (!acc[category]) acc[category] = []
+      acc[category].push(perm)
+      return acc
+    },
+    {} as Record<string, Permission[]>
+  )
 
   if (loading) {
-    return <div className="text-center py-8">Carregando...</div>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <CircularProgress />
+      </Box>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center pb-4 border-b border-border">
-        <h3 className="text-lg font-semibold text-foreground">Permissões de {role.display_name}</h3>
-        <Button onClick={handleSave} size="sm">Salvar Permissões</Button>
-      </div>
-
-      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Typography variant="subtitle1" fontWeight={600}>Permissões de {role.display_name}</Typography>
+        <Button variant="contained" size="small" onClick={handleSave}>Salvar Permissões</Button>
+      </Box>
+      <Box sx={{ maxHeight: '60vh', overflowY: 'auto', pr: 1 }}>
         {Object.entries(groupedPermissions).map(([category, perms]) => (
-          <div key={category} className="rounded-lg border border-border bg-card shadow-sm p-4">
-            <h4 className="font-semibold mb-3 capitalize text-sm text-foreground">{category}</h4>
-            <div className="space-y-2">
+          <Paper key={category} variant="outlined" sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, textTransform: 'capitalize' }}>{category}</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {perms.map((perm) => (
-                <label
+                <FormControlLabel
                   key={perm.id}
-                  className="flex items-start gap-3 p-3 rounded-md border border-border bg-background hover:bg-muted/50 cursor-pointer transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedPermissions.includes(perm.id)}
-                    onChange={() => handleTogglePermission(perm.id)}
-                    className="mt-0.5 h-4 w-4 rounded border-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-foreground">{perm.display_name}</div>
-                    {perm.description && (
-                      <div className="text-sm text-muted-foreground mt-1">{perm.description}</div>
-                    )}
-                  </div>
-                </label>
+                  control={
+                    <Checkbox
+                      checked={selectedPermissions.includes(perm.id)}
+                      onChange={() => handleTogglePermission(perm.id)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>{perm.display_name}</Typography>
+                      {perm.description && (
+                        <Typography variant="caption" color="text.secondary" display="block">{perm.description}</Typography>
+                      )}
+                    </Box>
+                  }
+                  sx={{
+                    m: 0,
+                    p: 1,
+                    borderRadius: 1,
+                    border: 1,
+                    borderColor: 'divider',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                />
               ))}
-            </div>
-          </div>
+            </Box>
+          </Paper>
         ))}
-      </div>
-    </div>
-  );
+      </Box>
+    </Box>
+  )
 }

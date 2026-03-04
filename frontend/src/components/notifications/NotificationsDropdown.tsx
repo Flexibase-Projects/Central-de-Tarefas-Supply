@@ -1,286 +1,229 @@
-import { useState, useMemo } from 'react';
-import { Bell, Check, Loader2, CheckSquare2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState, useMemo } from 'react'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
+  IconButton,
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Box,
+  Typography,
+  CircularProgress,
   Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { useNotifications } from '@/hooks/use-notifications';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
-import { Notification } from '@/types';
-import { cn } from '@/lib/utils';
+  Badge,
+} from '@mui/material'
+import { Notifications as NotificationsIcon, Check, CheckBox } from '@mui/icons-material'
+import { useNotifications } from '@/hooks/use-notifications'
+import { formatDistanceToNow } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { useNavigate } from 'react-router-dom'
+import { Notification } from '@/types'
 
 export function NotificationsDropdown() {
-  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications();
-  const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
+  const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications()
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const open = Boolean(anchorEl)
+  const navigate = useNavigate()
 
-  const unreadNotifications = notifications.filter((n) => !n.read);
-  
-  // Agrupar notificações não lidas por projeto para preview
+  const unreadNotifications = notifications.filter((n) => !n.read)
+
   const unreadByProject = useMemo(() => {
-    const groups: { [key: string]: { name: string; count: number } } = {};
-    
+    const map = new Map<string, { name: string; count: number }>()
     unreadNotifications.forEach((notification) => {
       if (notification.project_id) {
-        const projectName = notification.message?.match(/projeto "([^"]+)"/)?.[1] || 'Projeto';
-        if (!groups[notification.project_id]) {
-          groups[notification.project_id] = { name: projectName, count: 0 };
-        }
-        groups[notification.project_id].count++;
+        const name = notification.message?.match(/projeto "([^"]+)"/)?.[1] || 'Projeto'
+        const cur = map.get(notification.project_id)
+        if (cur) cur.count++
+        else map.set(notification.project_id, { name, count: 1 })
       }
-    });
-    
-    return Object.values(groups);
-  }, [unreadNotifications]);
+    })
+    return Array.from(map.values())
+  }, [unreadNotifications])
 
-  // Agrupar notificações por projeto
   const groupedNotifications = useMemo(() => {
-    const groups: { [key: string]: Notification[] } = {};
-    const withoutProject: Notification[] = [];
-
+    const groups: { [key: string]: Notification[] } = {}
+    const withoutProject: Notification[] = []
     notifications.forEach((notification) => {
       if (notification.project_id) {
-        if (!groups[notification.project_id]) {
-          groups[notification.project_id] = [];
-        }
-        groups[notification.project_id].push(notification);
+        if (!groups[notification.project_id]) groups[notification.project_id] = []
+        groups[notification.project_id].push(notification)
       } else {
-        withoutProject.push(notification);
+        withoutProject.push(notification)
       }
-    });
+    })
+    return { groups, withoutProject }
+  }, [notifications])
 
-    return { groups, withoutProject };
-  }, [notifications]);
+  const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget)
+  }
+
+  const handleClose = () => {
+    setAnchorEl(null)
+  }
 
   const handleNotificationClick = (notification: Notification) => {
     if (notification.project_id) {
-      // Marcar como lida
-      if (!notification.read) {
-        markAsRead(notification.id);
-      }
-      // Fechar popover
-      setOpen(false);
-      // Navegar para desenvolvimentos com o project_id e todo_id se houver
-      const params = new URLSearchParams({ project: notification.project_id });
+      if (!notification.read) markAsRead(notification.id)
+      handleClose()
+      const params = new URLSearchParams({ project: notification.project_id })
       if (notification.related_id && notification.related_type === 'todo') {
-        params.set('todo', notification.related_id);
+        params.set('todo', notification.related_id)
       }
-      navigate(`/desenvolvimentos?${params.toString()}`);
+      navigate(`/desenvolvimentos?${params.toString()}`)
     }
-  };
+  }
 
   return (
-    <TooltipProvider>
-      <Popover open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
-                <span className={cn(
-                  "h-6 w-6 rounded-full text-xs font-bold flex items-center justify-center shadow-lg border-2 border-background shrink-0",
-                  "bg-destructive text-destructive-foreground",
-                  "ring-2 ring-destructive/50 ring-offset-1",
-                  "animate-pulse"
-                )}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+    <>
+      <Tooltip
+        title={
+          unreadCount > 0 ? (
+            <Box>
+              <Typography variant="body2" fontWeight={600}>Você tem {unreadCount} {unreadCount === 1 ? 'tarefa pendente' : 'tarefas pendentes'}</Typography>
+              {unreadByProject.length > 0 && (
+                <Box sx={{ mt: 0.5 }}>
+                  {unreadByProject.slice(0, 3).map((project, idx) => (
+                    <Typography key={idx} variant="caption" display="block" color="inherit" sx={{ opacity: 0.9 }}>
+                      • {project.count} TO-DO(s) em {project.name}
+                    </Typography>
+                  ))}
+                </Box>
               )}
-              <PopoverTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={cn(
-                    "relative h-10 px-3 gap-2 transition-all",
-                    unreadCount > 0 && "bg-primary/10 hover:bg-primary/20"
-                  )}
-                >
-                  <Bell className={cn(
-                    "h-5 w-5 transition-all shrink-0",
-                    unreadCount > 0 && "text-primary"
-                  )} />
-                  {unreadCount > 0 && (
-                    <span className="text-sm font-semibold text-primary hidden sm:inline">
-                      {unreadCount} {unreadCount === 1 ? 'pendente' : 'pendentes'}
-                    </span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-            </div>
-          </TooltipTrigger>
-          {unreadCount > 0 && (
-            <TooltipContent side="bottom" className="max-w-xs">
-              <div className="space-y-1">
-                <p className="font-semibold text-sm">Você tem {unreadCount} {unreadCount === 1 ? 'tarefa pendente' : 'tarefas pendentes'}</p>
-                {unreadByProject.length > 0 && (
-                  <div className="text-xs space-y-0.5">
-                    {unreadByProject.slice(0, 3).map((project, idx) => (
-                      <p key={idx} className="text-muted-foreground">
-                        • {project.count} {project.count === 1 ? 'TO-DO' : 'TO-DOs'} em {project.name}
-                      </p>
-                    ))}
-                    {unreadByProject.length > 3 && (
-                      <p className="text-muted-foreground italic">
-                        +{unreadByProject.length - 3} {unreadByProject.length - 3 === 1 ? 'projeto' : 'projetos'} mais
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold text-sm">Notificações</h3>
+            </Box>
+          ) : (
+            'Notificações'
+          )
+        }
+      >
+        <IconButton
+          onClick={handleOpen}
+          color={unreadCount > 0 ? 'primary' : 'default'}
+          sx={{ position: 'relative' }}
+          aria-label="Notificações"
+          aria-controls={open ? 'notifications-menu' : undefined}
+          aria-haspopup="true"
+          aria-expanded={open ? 'true' : undefined}
+        >
+          <Badge badgeContent={unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : 0} color="error">
+            <NotificationsIcon />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+      <Menu
+        id="notifications-menu"
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { width: 320, maxHeight: 440 } }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="subtitle2" fontWeight={600}>Notificações</Typography>
           {unreadNotifications.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={markAllAsRead}
-              className="h-7 text-xs"
-            >
-              <Check className="h-3 w-3 mr-1" />
+            <Button size="small" startIcon={<Check />} onClick={markAllAsRead}>
               Marcar todas como lidas
             </Button>
           )}
-        </div>
-        <ScrollArea className="h-[400px]">
+        </Box>
+        <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={24} />
+            </Box>
           ) : notifications.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
+            <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: 'center' }}>
               Nenhuma notificação
-            </div>
+            </Typography>
           ) : (
-            <div className="divide-y">
-              {/* Notificações agrupadas por projeto */}
+            <>
               {Object.entries(groupedNotifications.groups).map(([projectId, projectNotifications]) => {
-                const projectName = projectNotifications[0]?.message?.match(/projeto "([^"]+)"/)?.[1] || 'Projeto';
-                
+                const projectName = projectNotifications[0]?.message?.match(/projeto "([^"]+)"/)?.[1] || 'Projeto'
                 return (
-                  <div key={projectId} className="divide-y">
-                    <div className="px-4 py-2 bg-muted/50 border-b">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  <Box key={projectId}>
+                    <Box sx={{ px: 2, py: 1, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' }}>
+                      <Typography variant="caption" fontWeight={600} color="text.secondary" sx={{ textTransform: 'uppercase' }}>
                         {projectName}
-                      </h4>
-                    </div>
+                      </Typography>
+                    </Box>
                     {projectNotifications.map((notification) => (
-                      <div
+                      <MenuItem
                         key={notification.id}
-                        className={`p-4 hover:bg-muted/50 transition-colors cursor-pointer ${
-                          !notification.read ? 'bg-muted/30' : ''
-                        }`}
                         onClick={() => handleNotificationClick(notification)}
+                        sx={{ py: 1.5, bgcolor: !notification.read ? 'action.selected' : undefined }}
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 shrink-0">
-                            <CheckSquare2 className={`h-4 w-4 ${
-                              !notification.read ? 'text-primary' : 'text-muted-foreground'
-                            }`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="text-sm font-medium">{notification.title}</h4>
-                              {!notification.read && (
-                                <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <CheckBox fontSize="small" color={!notification.read ? 'primary' : 'inherit'} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={notification.title}
+                          secondary={
+                            <>
+                              {notification.message && (
+                                <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {notification.message}
+                                </Typography>
                               )}
-                            </div>
-                            {notification.message && (
-                              <p className="text-xs text-muted-foreground mb-1 line-clamp-2">
-                                {notification.message}
-                              </p>
-                            )}
-                            <p className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(notification.created_at), {
-                                addSuffix: true,
-                                locale: ptBR,
-                              })}
-                            </p>
-                          </div>
-                          {!notification.read && (
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => markAsRead(notification.id)}
-                                className="h-6 w-6 p-0"
-                              >
-                                <Check className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-              
-              {/* Notificações sem projeto */}
-              {groupedNotifications.withoutProject.length > 0 && (
-                <div className="divide-y">
-                  {groupedNotifications.withoutProject.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 hover:bg-muted/50 transition-colors ${
-                        !notification.read ? 'bg-muted/30' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="text-sm font-medium">{notification.title}</h4>
-                            {!notification.read && (
-                              <span className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                            )}
-                          </div>
-                          {notification.message && (
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {notification.message}
-                            </p>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(notification.created_at), {
-                              addSuffix: true,
-                              locale: ptBR,
-                            })}
-                          </p>
-                        </div>
+                              <Typography component="span" variant="caption" color="text.secondary">
+                                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ptBR })}
+                              </Typography>
+                            </>
+                          }
+                          primaryTypographyProps={{ fontWeight: !notification.read ? 600 : 400 }}
+                        />
                         {!notification.read && (
-                          <div className="flex gap-1 shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => markAsRead(notification.id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <Check className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          <IconButton
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              markAsRead(notification.id)
+                            }}
+                          >
+                            <Check fontSize="small" />
+                          </IconButton>
                         )}
-                      </div>
-                    </div>
+                      </MenuItem>
+                    ))}
+                  </Box>
+                )
+              })}
+              {groupedNotifications.withoutProject.length > 0 && (
+                <Box>
+                  {groupedNotifications.withoutProject.map((notification) => (
+                    <MenuItem key={notification.id} sx={{ py: 1.5, bgcolor: !notification.read ? 'action.selected' : undefined }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <CheckBox fontSize="small" color={!notification.read ? 'primary' : 'inherit'} />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={notification.title}
+                        secondary={
+                          <>
+                            {notification.message && (
+                              <Typography component="span" variant="caption" color="text.secondary" display="block">
+                                {notification.message}
+                              </Typography>
+                            )}
+                            <Typography component="span" variant="caption" color="text.secondary">
+                              {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: ptBR })}
+                            </Typography>
+                          </>
+                        }
+                        primaryTypographyProps={{ fontWeight: !notification.read ? 600 : 400 }}
+                      />
+                      {!notification.read && (
+                        <IconButton size="small" onClick={() => markAsRead(notification.id)}>
+                          <Check fontSize="small" />
+                        </IconButton>
+                      )}
+                    </MenuItem>
                   ))}
-                </div>
+                </Box>
               )}
-            </div>
+            </>
           )}
-        </ScrollArea>
-      </PopoverContent>
-      </Popover>
-    </TooltipProvider>
-  );
+        </Box>
+      </Menu>
+    </>
+  )
 }

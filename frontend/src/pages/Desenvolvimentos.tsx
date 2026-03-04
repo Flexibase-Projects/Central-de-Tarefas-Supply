@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Box, CircularProgress, Fab, Typography } from '@mui/material'
+import { Add } from '@mui/icons-material'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ProjectCardDialog } from '@/components/kanban/project-card-dialog'
 import { CreateProjectDialog } from '@/components/kanban/create-project-dialog'
@@ -85,33 +85,35 @@ export default function Desenvolvimentos() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Carregando projetos...</div>
-      </div>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <CircularProgress />
+          <Typography color="text.secondary">Carregando projetos...</Typography>
+        </Box>
+      </Box>
     )
   }
 
   return (
     <ProtectedRoute permission="access_desenvolvimentos">
-      <div className="h-full flex flex-col relative">
-        <div className="flex-1 overflow-hidden px-6 pt-4 pb-6">
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <Box sx={{ flex: 1, overflow: 'hidden', px: 3, pt: 2, pb: 3 }}>
           <KanbanBoard
             projects={projects}
             onProjectMove={handleProjectMove}
             onProjectClick={handleProjectClick}
           />
-        </div>
+        </Box>
 
-        {/* Botão flutuante */}
         <RequirePermission permission="move_card">
-          <Button
+          <Fab
+            color="primary"
+            aria-label="Novo Projeto"
             onClick={() => setIsCreateDialogOpen(true)}
-            className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-shadow z-50"
-            size="icon"
+            sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
           >
-            <Plus className="h-6 w-6" />
-            <span className="sr-only">Novo Projeto</span>
-          </Button>
+            <Add />
+          </Fab>
         </RequirePermission>
 
       <CreateProjectDialog
@@ -128,7 +130,7 @@ export default function Desenvolvimentos() {
           onDelete={handleDeleteProject}
           highlightedTodoId={highlightedTodoId}
         />
-      </div>
+      </Box>
     </ProtectedRoute>
   )
 }

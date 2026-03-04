@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 export function useUsers() {
-  const { currentUser } = useAuth();
+  const { currentUser, getAuthHeaders } = useAuth();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,9 +20,7 @@ export function useUsers() {
         : `${API_URL}/api/users?userId=${userId}`;
       
       const response = await fetch(url, {
-        headers: {
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -37,7 +35,7 @@ export function useUsers() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, getAuthHeaders]);
 
   useEffect(() => {
     fetchUsers();
@@ -45,13 +43,9 @@ export function useUsers() {
 
   const createUser = async (userData: { email: string; name: string; avatar_url?: string }) => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/users`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(userData),
       });
 
@@ -69,13 +63,9 @@ export function useUsers() {
 
   const updateUser = async (id: string, userData: Partial<User>) => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users/${id}?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/users/${id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(userData),
       });
 
@@ -93,12 +83,9 @@ export function useUsers() {
 
   const deleteUser = async (id: string) => {
     try {
-      const userId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users/${id}?userId=${userId}`, {
+      const response = await fetch(`${API_URL}/api/users/${id}`, {
         method: 'DELETE',
-        headers: {
-          'x-user-id': userId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -114,12 +101,9 @@ export function useUsers() {
   const assignRole = async (userId: string, roleId: string) => {
     try {
       const currentUserId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users/${userId}/role?userId=${currentUserId}`, {
+      const response = await fetch(`${API_URL}/api/users/${userId}/role`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': currentUserId,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ role_id: roleId, assigned_by: currentUserId }),
       });
 
@@ -135,12 +119,9 @@ export function useUsers() {
 
   const removeRole = async (userId: string) => {
     try {
-      const currentUserId = currentUser?.id || '';
-      const response = await fetch(`${API_URL}/api/users/${userId}/role?userId=${currentUserId}`, {
+      const response = await fetch(`${API_URL}/api/users/${userId}/role`, {
         method: 'DELETE',
-        headers: {
-          'x-user-id': currentUserId,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

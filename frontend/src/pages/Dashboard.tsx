@@ -1,33 +1,29 @@
+import { Box, Card, CardContent, Typography } from '@mui/material';
+
+const metrics = [
+  { label: 'Projetos Ativos', value: '-' },
+  { label: 'Tarefas em Andamento', value: '-' },
+  { label: 'Próximas Revisões', value: '-' },
+  { label: 'Concluídos', value: '-' },
+];
+
 export default function Dashboard() {
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Placeholder para métricas futuras */}
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Projetos Ativos
-          </div>
-          <div className="mt-2 text-2xl font-bold">-</div>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Tarefas em Andamento
-          </div>
-          <div className="mt-2 text-2xl font-bold">-</div>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Próximas Revisões
-          </div>
-          <div className="mt-2 text-2xl font-bold">-</div>
-        </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="text-sm font-medium text-muted-foreground">
-            Concluídos
-          </div>
-          <div className="mt-2 text-2xl font-bold">-</div>
-        </div>
-      </div>
-    </div>
-  )
+    <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3 }}>
+        {metrics.map((m) => (
+          <Card key={m.label} variant="outlined" sx={{ height: '100%' }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" fontWeight={500}>
+                {m.label}
+              </Typography>
+              <Typography variant="h4" fontWeight={700} sx={{ mt: 1 }}>
+                {m.value}
+              </Typography>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+    </Box>
+  );
 }

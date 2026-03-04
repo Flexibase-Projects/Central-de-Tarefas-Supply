@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import * as React from 'react'
+import { Box, TextField, IconButton, Checkbox, FormControl, Select, MenuItem, LinearProgress, Typography, InputAdornment } from '@mui/material'
+import { Delete, DragIndicator, Add, } from '@mui/icons-material'
 import { ProjectTodo } from '@/types'
 import { useTodos } from '@/hooks/use-todos'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useUsersList } from '@/hooks/use-users-list'
 import { RequirePermission } from '@/components/auth/RequirePermission'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Trash2, GripVertical, Plus, Loader2 } from 'lucide-react'
+import { CircularProgress } from '@mui/material'
 import {
   DndContext,
   closestCenter,
@@ -79,68 +79,54 @@ function TodoItem({ todo, onToggle, onDelete, onAssign, users, isHighlighted }: 
   }
 
   return (
-    <div
-      ref={(node) => {
-        setNodeRef(node)
-        if (node) {
-          ;(itemRef as React.MutableRefObject<HTMLDivElement | null>).current = node
-        }
+    <Box
+      ref={(node: HTMLDivElement | null) => {
+        setNodeRef(node as HTMLElement | null)
+        ;(itemRef as React.MutableRefObject<HTMLDivElement | null>).current = node
       }}
+      component="div"
       style={style}
-      className={`flex items-center gap-2 p-2 rounded group w-full transition-all ${
-        shouldHighlight
-          ? 'bg-yellow-100 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-500 shadow-md animate-pulse-3'
-          : 'hover:bg-muted/50'
-      }`}
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        p: 1,
+        borderRadius: 1,
+        width: '100%',
+        transition: 'all 0.2s',
+        ...(shouldHighlight
+          ? { bgcolor: 'warning.light', border: 2, borderColor: 'warning.main', boxShadow: 2 }
+          : { '&:hover': { bgcolor: 'action.hover' }, '&:hover .delete-btn': { opacity: 1 } }),
+      }}
     >
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-      >
-        <GripVertical className="h-4 w-4" />
-      </div>
-      <input
-        type="checkbox"
-        checked={todo.completed}
-        onChange={(e) => onToggle(todo.id, e.target.checked)}
-        className="h-4 w-4 rounded border-gray-300"
-      />
-      <span
-        className={`flex-1 text-sm min-w-0 ${
-          todo.completed
-            ? 'line-through text-muted-foreground'
-            : 'text-foreground'
-        }`}
-      >
+      <Box {...attributes} {...listeners} sx={{ cursor: 'grab', color: 'text.secondary', '&:active': { cursor: 'grabbing' } }}>
+        <DragIndicator sx={{ fontSize: 18 }} />
+      </Box>
+      <Checkbox size="small" checked={todo.completed} onChange={(e) => onToggle(todo.id, e.target.checked)} />
+      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, ...(todo.completed && { textDecoration: 'line-through', color: 'text.secondary' }) }}>
         {todo.title}
-      </span>
-      <select
-        value={todo.assigned_to || ''}
-        onChange={(e) => onAssign(todo.id, e.target.value || null)}
-        className="h-7 min-w-[140px] px-2 rounded-md border border-input bg-background text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 shrink-0"
-        disabled={todo.completed}
-      >
-        <option value="">Sem responsável</option>
-        {users.length === 0 ? (
-          <option disabled>Carregando usuários...</option>
-        ) : (
-          users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
-            </option>
-          ))
-        )}
-      </select>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onDelete(todo.id)}
-        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        <Trash2 className="h-3 w-3" />
-      </Button>
-    </div>
+      </Typography>
+      <FormControl size="small" sx={{ minWidth: 140 }} disabled={todo.completed}>
+        <Select
+          value={todo.assigned_to || ''}
+          onChange={(e) => onAssign(todo.id, e.target.value || null)}
+          displayEmpty
+          sx={{ fontSize: 12, height: 28 }}
+        >
+          <MenuItem value="">Sem responsável</MenuItem>
+          {users.length === 0 ? (
+            <MenuItem disabled>Carregando usuários...</MenuItem>
+          ) : (
+            users.map((user) => (
+              <MenuItem key={user.id} value={user.id}>{user.name}</MenuItem>
+            ))
+          )}
+        </Select>
+      </FormControl>
+      <IconButton className="delete-btn" size="small" onClick={() => onDelete(todo.id)} sx={{ opacity: 0 }}>
+        <Delete sx={{ fontSize: 16 }} />
+      </IconButton>
+    </Box>
   )
 }
 
@@ -227,68 +213,57 @@ export function TodoList({ projectId, highlightedTodoId }: TodoListProps) {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Progress Bar */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {totalCount > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Progresso</span>
-            <span className="font-medium">{progressPercentage}%</span>
-          </div>
-          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-300 ease-out"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-          <div className="text-xs text-muted-foreground text-center">
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, mb: 0.5 }}>
+            <Typography variant="caption" color="text.secondary">Progresso</Typography>
+            <Typography variant="caption" fontWeight={500}>{progressPercentage}%</Typography>
+          </Box>
+          <LinearProgress variant="determinate" value={progressPercentage} sx={{ height: 8, borderRadius: 1 }} />
+          <Typography variant="caption" color="text.secondary" display="block" textAlign="center" sx={{ mt: 0.5 }}>
             {completedCount} de {totalCount} concluídos
-          </div>
-        </div>
+          </Typography>
+        </Box>
       )}
 
       <RequirePermission permission="create_todo">
-        <div className="flex gap-2">
-          <Input
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
             value={newTodoTitle}
             onChange={(e) => setNewTodoTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleCreateTodo()
-              }
-            }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCreateTodo(); } }}
             placeholder="Adicionar novo item..."
-            className="flex-1"
             disabled={!canCreateTodo}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={handleCreateTodo} disabled={!canCreateTodo || !newTodoTitle.trim()}>
+                    <Add />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
-          <Button onClick={handleCreateTodo} size="sm" disabled={!canCreateTodo || !newTodoTitle.trim()}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
+        </Box>
       </RequirePermission>
 
       {loading ? (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <CircularProgress size={24} />
+        </Box>
       ) : todos.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">
+        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
           Nenhum item na lista. Adicione um novo item acima.
-        </p>
+        </Typography>
       ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={todos.map((todo) => todo.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-1">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={todos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {todos.map((todo) => {
-                const assignedUser = users.find(u => u.id === todo.assigned_to)
+                const assignedUser = users.find((u) => u.id === todo.assigned_to)
                 return (
                   <TodoItem
                     key={todo.id}
@@ -302,10 +277,10 @@ export function TodoList({ projectId, highlightedTodoId }: TodoListProps) {
                   />
                 )
               })}
-            </div>
+            </Box>
           </SortableContext>
         </DndContext>
       )}
-    </div>
+    </Box>
   )
 }

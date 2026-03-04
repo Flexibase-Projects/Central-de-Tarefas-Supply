@@ -91,6 +91,50 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Perfil do usuário autenticado (não exige admin)
+router.get('/me', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] as string | undefined;
+    if (!userId || isLoginRequest(req)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const { data: user, error: userError } = await supabase
+      .from('cdt_users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('cdt_user_roles')
+      .select(`
+        role_id,
+        cdt_roles (
+          id,
+          name,
+          display_name,
+          description
+        )
+      `)
+      .eq('user_id', userId)
+      .single();
+
+    res.json({
+      ...user,
+      role: userRole?.cdt_roles || null,
+    });
+  } catch (error: any) {
+    if (isSupabaseConnectionRefused(error)) {
+      return res.status(503).json({ error: SUPABASE_UNAVAILABLE_MESSAGE });
+    }
+    console.error('Error fetching current user:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch user' });
+  }
+});
+
 // Get user by ID
 router.get('/:id', checkRole('admin'), async (req, res) => {
   try {
