@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Box, CircularProgress, Typography } from '@mui/material'
 import { useTeamCanvas } from '@/hooks/use-team-canvas'
-import { useThemeMode } from '@/theme/ThemeProvider'
 import '@excalidraw/excalidraw/index.css'
 
 export default function CanvaEquipe() {
@@ -9,9 +8,8 @@ export default function CanvaEquipe() {
   useEffect(() => {
     import('@excalidraw/excalidraw').then((mod) => setExcalidrawComponent(() => mod.Excalidraw))
   }, [])
-  const { mode } = useThemeMode()
   const { data, loading, saving, error, saveContent } = useTeamCanvas()
-  const theme = mode === 'dark' ? 'dark' : 'light'
+  const theme = 'dark'
 
   const handleChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>) => {

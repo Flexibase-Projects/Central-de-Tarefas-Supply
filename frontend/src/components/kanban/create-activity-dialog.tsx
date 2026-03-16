@@ -12,8 +12,10 @@ import {
   MenuItem,
   Box,
   Typography,
+  InputAdornment,
 } from '@mui/material'
 import { Activity } from '@/types'
+import { useAchievements } from '@/hooks/use-achievements'
 
 interface CreateActivityDialogProps {
   open: boolean
@@ -36,12 +38,19 @@ const priorityOptions: { value: Activity['priority']; label: string }[] = [
 ]
 
 export function CreateActivityDialog({ open, onOpenChange, onCreate }: CreateActivityDialogProps) {
+  const { achievements } = useAchievements()
+  const linkedAchievements = achievements.filter(
+    (achievement) => (achievement.mode ?? 'global_auto') === 'linked_item'
+  )
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     status: 'backlog' as Activity['status'],
     priority: 'medium' as Activity['priority'],
     due_date: '' as string,
+    xp_reward: 1,
+    deadline_bonus_percent: 0,
+    achievement_id: '' as string,
   })
   const [loading, setLoading] = useState(false)
 
@@ -57,8 +66,20 @@ export function CreateActivityDialog({ open, onOpenChange, onCreate }: CreateAct
         status: formData.status,
         priority: formData.priority,
         due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
+        xp_reward: formData.xp_reward,
+        deadline_bonus_percent: formData.deadline_bonus_percent,
+        achievement_id: formData.achievement_id || null,
       })
-      setFormData({ name: '', description: '', status: 'backlog', priority: 'medium', due_date: '' })
+      setFormData({
+        name: '',
+        description: '',
+        status: 'backlog',
+        priority: 'medium',
+        due_date: '',
+        xp_reward: 1,
+        deadline_bonus_percent: 0,
+        achievement_id: '',
+      })
       onOpenChange(false)
     } catch (error) {
       console.error('Error creating activity:', error)
@@ -117,14 +138,71 @@ export function CreateActivityDialog({ open, onOpenChange, onCreate }: CreateAct
                 ))}
               </Select>
             </FormControl>
-            <TextField
-              label="Data de Vencimento"
-              type="date"
-              value={formData.due_date}
-              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-            />
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="Data de Vencimento"
+                type="date"
+                value={formData.due_date}
+                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+                sx={{ flex: 1 }}
+              />
+              {/* XP reward for this activity */}
+              <TextField
+                label="XP"
+                type="number"
+                value={formData.xp_reward}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    xp_reward: Math.max(0.01, Math.min(1000, Number(e.target.value))),
+                  })
+                }
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ min: 0.01, max: 1000, step: 0.01 }}
+                sx={{ width: 100 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography sx={{ fontSize: 11, color: 'secondary.main', fontWeight: 700 }}>+</Typography>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <TextField
+                label="% Bônus no Prazo"
+                type="number"
+                value={formData.deadline_bonus_percent}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    deadline_bonus_percent: Math.max(0, Math.min(500, Number(e.target.value))),
+                  })
+                }
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ min: 0, max: 500, step: 0.01 }}
+                sx={{ width: 180 }}
+              />
+
+              <FormControl sx={{ minWidth: 220 }}>
+                <InputLabel>Conquista Vinculada</InputLabel>
+                <Select
+                  value={formData.achievement_id}
+                  label="Conquista Vinculada"
+                  onChange={(e) => setFormData({ ...formData, achievement_id: String(e.target.value) })}
+                >
+                  <MenuItem value="">Nenhuma</MenuItem>
+                  {linkedAchievements.map((achievement) => (
+                    <MenuItem key={achievement.id} value={achievement.id}>
+                      {achievement.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

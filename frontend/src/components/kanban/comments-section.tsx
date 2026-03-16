@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Box, TextField, Button, Typography, Avatar, IconButton, CircularProgress } from '@mui/material'
-import { Send, Delete } from '@mui/icons-material'
+import { Send, Trash2 } from '@/components/ui/icons'
 import { Comment } from '@/types'
 import { useProjectComments } from '@/hooks/use-project-comments'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatDistanceToNow } from 'date-fns'
+import { TierBadge } from '@/components/gamification/TierBadge'
 
 interface CommentsSectionProps {
   projectId: string
@@ -17,33 +18,43 @@ interface CommentItemProps {
 
 function CommentItem({ comment, onDelete }: CommentItemProps) {
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, p: 1.5, borderRadius: 1, border: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        gap: 1.5,
+        p: 1.5,
+        borderRadius: 1,
+        border: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+      }}
+    >
       <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
           <Typography variant="body2" fontWeight={500}>
             {comment.author_name || 'Usuário Anônimo'}
           </Typography>
+          {comment.author_level != null && comment.author_level > 0 && (
+            <TierBadge level={comment.author_level} size="xs" />
+          )}
           <Typography variant="caption" color="text.secondary">
             {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
           </Typography>
         </Box>
-        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography>
+        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+          {comment.content}
+        </Typography>
       </Box>
       <IconButton size="small" onClick={() => onDelete(comment.id)}>
-        <Delete sx={{ fontSize: 16 }} />
+        <Trash2 size={16} />
       </IconButton>
     </Box>
   )
 }
 
 export function CommentsSection({ projectId }: CommentsSectionProps) {
-  const {
-    comments,
-    loading,
-    createComment,
-    deleteComment,
-  } = useProjectComments(projectId)
+  const { comments, loading, createComment, deleteComment } = useProjectComments(projectId)
   const { currentUser } = useAuth()
   const [newComment, setNewComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)

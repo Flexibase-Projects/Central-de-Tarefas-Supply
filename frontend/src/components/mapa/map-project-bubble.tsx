@@ -1,3 +1,4 @@
+import { Box } from '@mui/material'
 import { Project } from '@/types'
 import {
   Tooltip,
@@ -5,7 +6,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { cn } from '@/lib/utils'
 
 interface MapProjectBubbleProps {
   project: Project
@@ -28,7 +28,8 @@ export function MapProjectBubble({
     <TooltipProvider delayDuration={300}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
+          <Box
+            component="span"
             role="button"
             tabIndex={0}
             draggable
@@ -43,17 +44,39 @@ export function MapProjectBubble({
                 onClick(project)
               }
             }}
-            className={cn(
-              'absolute z-10 flex h-11 w-11 cursor-grab items-center justify-center rounded-full border-2 border-primary/30 bg-primary/15 text-sm font-semibold text-foreground shadow-sm transition-shadow active:cursor-grabbing hover:shadow-md hover:bg-primary/25'
-            )}
-            style={{
+            sx={{
+              position: 'absolute',
+              zIndex: 10,
               left: `${x}%`,
               top: `${y}%`,
               transform: 'translate(-50%, -50%)',
+              width: 44,
+              height: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              border: '2px solid',
+              borderColor: 'primary.main',
+              bgcolor: 'primary.main',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'grab',
+              boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+              transition: 'box-shadow 0.2s, transform 0.15s',
+              '&:hover': {
+                boxShadow: '0 4px 16px rgba(37,99,235,0.4)',
+                bgcolor: 'primary.light',
+                transform: 'scale(1.06)',
+              },
+              '&:active': {
+                cursor: 'grabbing',
+              },
             }}
           >
             {abbreviation}
-          </div>
+          </Box>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-[200px]">
           <p className="font-medium">{project.name}</p>

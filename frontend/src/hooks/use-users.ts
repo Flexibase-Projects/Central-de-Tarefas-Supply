@@ -152,11 +152,19 @@ export function useUsers() {
     }
   }, [getAuthHeaders]);
 
-  const giveAccessFromAuth = async (authUser: { id: string; email: string; name: string }) => {
+  const giveAccessFromAuth = async (
+    authUser: { id: string; email: string; name: string },
+    roleId?: string | null,
+  ) => {
     const response = await fetch(`${API_URL}/api/users/from-auth`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ id: authUser.id, email: authUser.email, name: authUser.name }),
+      body: JSON.stringify({
+        id: authUser.id,
+        email: authUser.email,
+        name: authUser.name,
+        role_id: roleId || null,
+      }),
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));

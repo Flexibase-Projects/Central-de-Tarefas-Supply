@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Box, CircularProgress, Fab, Typography } from '@mui/material'
-import { Add } from '@mui/icons-material'
+import { Plus } from '@/components/ui/icons'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ProjectCardDialog } from '@/components/kanban/project-card-dialog'
 import { CreateProjectDialog } from '@/components/kanban/create-project-dialog'
@@ -112,7 +112,7 @@ export default function Desenvolvimentos() {
             onClick={() => setIsCreateDialogOpen(true)}
             sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
           >
-            <Add />
+            <Plus size={24} />
           </Fab>
         </RequirePermission>
 

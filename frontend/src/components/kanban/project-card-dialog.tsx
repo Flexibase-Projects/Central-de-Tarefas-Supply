@@ -11,21 +11,21 @@ import {
   Paper,
 } from '@mui/material'
 import {
-  OpenInNew,
+  ExternalLink,
   Code,
-  CalendarMonth,
+  Calendar,
   Lock,
   Archive,
-  LocalOffer,
-  ExpandMore,
-  ExpandLess,
-  Description,
-  CheckBox,
-  Comment,
+  Tag,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  CheckSquare,
+  MessageCircleIcon,
   Settings,
-  Delete,
-  Edit,
-} from '@mui/icons-material'
+  Trash2,
+  Pencil,
+} from '@/components/ui/icons'
 import { Project, GitHubCommit, GitHubRepository } from '@/types'
 import { useGitHub } from '@/hooks/use-github'
 import { TodoList } from './todo-list'
@@ -176,7 +176,7 @@ export function ProjectCardDialog({
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <Box>
                     <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <CheckBox sx={{ fontSize: 18 }} /> TO-DO
+                      <CheckSquare size={18} /> TO-DO
                     </Typography>
                     <Paper variant="outlined" sx={{ p: 2 }}>
                       <TodoList projectId={project.id} highlightedTodoId={highlightedTodoId} />
@@ -184,7 +184,7 @@ export function ProjectCardDialog({
                   </Box>
                   <Box>
                     <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Comment sx={{ fontSize: 18 }} /> Comentários
+                      <MessageCircleIcon size={18} /> Comentários
                     </Typography>
                     <Paper variant="outlined" sx={{ p: 2 }}>
                       <CommentsSection projectId={project.id} />
@@ -194,10 +194,10 @@ export function ProjectCardDialog({
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Description sx={{ fontSize: 18 }} /> README
+                          <FileText size={18} /> README
                         </Typography>
                         {readme && (
-                          <Button size="small" onClick={() => setReadmeExpanded(!readmeExpanded)} startIcon={readmeExpanded ? <ExpandLess /> : <ExpandMore />}>
+                          <Button size="small" onClick={() => setReadmeExpanded(!readmeExpanded)} startIcon={readmeExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}>
                             {readmeExpanded ? 'Ver menos' : 'Ver mais'}
                           </Button>
                         )}
@@ -238,7 +238,7 @@ export function ProjectCardDialog({
                                   <Box sx={{ minWidth: 0, flex: 1 }}>
                                     <Typography component="a" href={commit.html_url} target="_blank" rel="noopener noreferrer" variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'underline' }}>
                                       {commit.commit.message.split('\n')[0]}
-                                      <OpenInNew sx={{ fontSize: 14 }} />
+                                      <ExternalLink size={14} />
                                     </Typography>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
                                       {commit.author && (
@@ -248,7 +248,7 @@ export function ProjectCardDialog({
                                         </Box>
                                       )}
                                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                        <CalendarMonth sx={{ fontSize: 12 }} />
+                                        <Calendar size={12} />
                                         <Typography variant="caption" color="text.secondary">
                                           {new Date(commit.commit.author.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </Typography>
@@ -276,13 +276,13 @@ export function ProjectCardDialog({
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <Typography variant="body2"><Typography component="span" color="text.secondary">Status:</Typography> {project.status.replace('_', ' ')}</Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CalendarMonth sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Calendar size={16} />
                           <Typography variant="body2" color="text.secondary">Criado em:</Typography>
                           <Typography variant="body2">{new Date(project.created_at).toLocaleDateString('pt-BR')}</Typography>
                         </Box>
                         {project.updated_at && (
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CalendarMonth sx={{ fontSize: 16, color: 'text.secondary' }} />
+                            <Calendar size={16} />
                             <Typography variant="body2" color="text.secondary">Atualizado em:</Typography>
                             <Typography variant="body2">{new Date(project.updated_at).toLocaleDateString('pt-BR')}</Typography>
                           </Box>
@@ -294,29 +294,29 @@ export function ProjectCardDialog({
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Code sx={{ fontSize: 18 }} /> Repositório GitHub
+                          <Code size={18} /> Repositório GitHub
                         </Typography>
                         {repoInfo && (
-                          <Button size="small" onClick={() => setShowDetails(!showDetails)} startIcon={showDetails ? <ExpandLess /> : <ExpandMore />}>
+                          <Button size="small" onClick={() => setShowDetails(!showDetails)} startIcon={showDetails ? <ChevronUp size={20} /> : <ChevronDown size={20} />}>
                             {showDetails ? 'Ver menos' : 'Ver mais'}
                           </Button>
                         )}
                       </Box>
                       <Paper variant="outlined" sx={{ p: 2 }}>
                         <Typography component="a" href={project.github_url} target="_blank" rel="noopener noreferrer" variant="body2" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                          <Code /> Acessar no GitHub <OpenInNew sx={{ fontSize: 14 }} />
+                          <Code /> Acessar no GitHub <ExternalLink size={14} />
                         </Typography>
                         {repoInfo && (
                           <>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
                               {repoInfo.private && (
                                 <Typography variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-                                  <Lock sx={{ fontSize: 12 }} /> Privado
+                                  <Lock size={12} /> Privado
                                 </Typography>
                               )}
                               {repoInfo.archived && (
                                 <Typography variant="caption" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-                                  <Archive sx={{ fontSize: 12 }} /> Arquivado
+                                  <Archive size={12} /> Arquivado
                                 </Typography>
                               )}
                               {repoInfo.license && (
@@ -337,7 +337,7 @@ export function ProjectCardDialog({
                                 </Box>
                                 {repoInfo.topics && repoInfo.topics.length > 0 && (
                                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                                    <LocalOffer sx={{ fontSize: 12 }} />
+                                    <Tag size={12} />
                                     {repoInfo.topics.slice(0, 8).map((topic) => (
                                       <Typography key={topic} variant="caption" sx={{ px: 1, py: 0.25, bgcolor: 'primary.main', color: 'primary.contrastText', borderRadius: 1 }}>{topic}</Typography>
                                     ))}
@@ -358,12 +358,12 @@ export function ProjectCardDialog({
                   )}
                   <Box>
                     <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <Settings sx={{ fontSize: 18 }} /> Configurações
+                      <Settings size={18} /> Configurações
                     </Typography>
                     <Paper variant="outlined" sx={{ p: 2 }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Edit sx={{ fontSize: 14 }} /> Editar card — Link do projeto
+                          <Pencil size={14} /> Editar card — Link do projeto
                         </Typography>
                         <TextField
                           size="small"
@@ -378,7 +378,7 @@ export function ProjectCardDialog({
                         </Button>
                       </Box>
                       <Box sx={{ borderTop: 1, borderColor: 'divider', pt: 1.5, mt: 1.5 }}>
-                        <Button variant="outlined" color="error" size="small" onClick={() => setDeleteConfirmStep(1)} disabled={!onDelete} startIcon={<Delete />}>
+                        <Button variant="outlined" color="error" size="small" onClick={() => setDeleteConfirmStep(1)} disabled={!onDelete} startIcon={<Trash2 size={20} />}>
                           Excluir este card
                         </Button>
                       </Box>

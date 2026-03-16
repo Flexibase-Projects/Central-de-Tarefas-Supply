@@ -14,10 +14,12 @@ import {
   Chip,
   Alert,
   Collapse,
+  InputAdornment,
 } from '@mui/material'
-import { Image as ImageIcon, DeleteOutline } from '@mui/icons-material'
+import { Image, Trash2 } from '@/components/ui/icons'
 import { Activity } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAchievements } from '@/hooks/use-achievements'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -44,6 +46,10 @@ const priorityOptions: { value: Activity['priority']; label: string }[] = [
 
 export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: ActivityCardDialogProps) {
   const { getAuthHeaders } = useAuth()
+  const { achievements } = useAchievements()
+  const linkedAchievements = achievements.filter(
+    (achievement) => (achievement.mode ?? 'global_auto') === 'linked_item'
+  )
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -51,6 +57,9 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
     priority: 'medium' as Activity['priority'],
     due_date: '' as string,
     cover_image_url: '' as string | null,
+    xp_reward: 1,
+    deadline_bonus_percent: 0,
+    achievement_id: '' as string,
   })
   const [loading, setLoading] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
@@ -66,6 +75,9 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
         priority: activity.priority,
         due_date: activity.due_date ? new Date(activity.due_date).toISOString().slice(0, 10) : '',
         cover_image_url: activity.cover_image_url ?? null,
+        xp_reward: activity.xp_reward ?? 1,
+        deadline_bonus_percent: activity.deadline_bonus_percent ?? 0,
+        achievement_id: activity.achievement_id ?? '',
       })
       setCoverError(null)
     }
@@ -83,6 +95,9 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
         description: formData.description || null,
         due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
         cover_image_url: formData.cover_image_url || null,
+        xp_reward: formData.xp_reward,
+        deadline_bonus_percent: formData.deadline_bonus_percent,
+        achievement_id: formData.achievement_id || null,
       })
       onOpenChange(false)
     } catch (error) {
@@ -164,7 +179,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
         style={{ display: 'none' }}
       />
       <form onSubmit={handleSubmit}>
-        {/* Área de capa sempre visível: mesmo lugar para ver, adicionar e remover */}
+        {/* Cover image area */}
         <Box
           sx={{
             width: '100%',
@@ -197,7 +212,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
               <Button
                 size="small"
                 variant="contained"
-                startIcon={<ImageIcon />}
+                startIcon={<Image size={20} />}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={coverUploading}
                 sx={{ textTransform: 'none', boxShadow: 2 }}
@@ -208,7 +223,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
                 size="small"
                 variant="contained"
                 color="error"
-                startIcon={<DeleteOutline />}
+                startIcon={<Trash2 size={20} />}
                 onClick={handleRemoveCover}
                 sx={{ textTransform: 'none', boxShadow: 2 }}
               >
@@ -233,7 +248,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
                 '&:hover': coverUploading ? {} : { bgcolor: 'action.selected', borderColor: 'primary.main', color: 'primary.main' },
               }}
             >
-              <ImageIcon sx={{ fontSize: 40, mb: 0.5, opacity: 0.7 }} />
+              <Image size={40} style={{ marginBottom: 4, opacity: 0.7 }} />
               <Typography variant="body2">
                 {coverUploading ? 'Enviando imagem...' : 'Clique para adicionar capa'}
               </Typography>
@@ -255,7 +270,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
 
         <DialogContent sx={{ pt: 2 }}>
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            {/* Conteúdo principal */}
+            {/* Main content */}
             <Box sx={{ flex: 1, minWidth: 260 }}>
               <TextField
                 label="Nome da atividade *"
@@ -293,6 +308,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
                     ))}
                   </Select>
                 </FormControl>
+
                 <FormControl size="small" sx={{ minWidth: 120 }}>
                   <InputLabel>Prioridade</InputLabel>
                   <Select
@@ -307,6 +323,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
                     ))}
                   </Select>
                 </FormControl>
+
                 <TextField
                   label="Vencimento"
                   type="date"
@@ -316,10 +333,66 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
                   size="small"
                   sx={{ width: 160 }}
                 />
+
+                {/* XP reward field */}
+                <TextField
+                  label="XP"
+                  type="number"
+                  value={formData.xp_reward}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      xp_reward: Math.max(0.01, Math.min(1000, Number(e.target.value))),
+                    })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ min: 0.01, max: 1000, step: 0.01 }}
+                  size="small"
+                  sx={{ width: 80 }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Typography sx={{ fontSize: 11, color: 'secondary.main', fontWeight: 700 }}>+</Typography>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+
+                <TextField
+                  label="% Bonus Prazo"
+                  type="number"
+                  value={formData.deadline_bonus_percent}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      deadline_bonus_percent: Math.max(0, Math.min(500, Number(e.target.value))),
+                    })
+                  }
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ min: 0, max: 500, step: 0.01 }}
+                  size="small"
+                  sx={{ width: 130 }}
+                />
+
+                <FormControl size="small" sx={{ minWidth: 220 }}>
+                  <InputLabel>Conquista Vinculada</InputLabel>
+                  <Select
+                    value={formData.achievement_id}
+                    label="Conquista Vinculada"
+                    onChange={(e) => setFormData({ ...formData, achievement_id: String(e.target.value) })}
+                  >
+                    <MenuItem value="">Nenhuma</MenuItem>
+                    {linkedAchievements.map((achievement) => (
+                      <MenuItem key={achievement.id} value={achievement.id}>
+                        {achievement.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
             </Box>
 
-            {/* Sidebar: status */}
+            {/* Sidebar: status badge */}
             <Box sx={{ width: 200, flexShrink: 0 }}>
               <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
                 Status
@@ -328,6 +401,7 @@ export function ActivityCardDialog({ activity, open, onOpenChange, onUpdate }: A
             </Box>
           </Box>
         </DialogContent>
+
         <DialogActions sx={{ px: 3, pb: 2, pt: 0 }}>
           <Button onClick={() => onOpenChange(false)} disabled={loading}>
             Fechar

@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
+import { Box, Typography } from '@mui/material'
 import { Project } from '@/types'
 import type { EisenhowerQuadrant } from '@/types'
 import type { ProjectMapPosition } from '@/types'
 import { mapBubbleLabel } from '@/lib/abbreviate'
 import { getProjectMapPosition } from '@/lib/map-position'
 import { MapProjectBubble } from './map-project-bubble'
-import { cn } from '@/lib/utils'
 
 const QUADRANT_LABELS: Record<EisenhowerQuadrant, { title: string; sub?: string }> = {
   1: { title: 'Urgente e Importante', sub: 'Fazer primeiro' },
@@ -14,26 +14,38 @@ const QUADRANT_LABELS: Record<EisenhowerQuadrant, { title: string; sub?: string 
   4: { title: 'Nem urgente nem importante', sub: 'Eliminar ou depois' },
 }
 
-/** Cores do quadro de Eisenhower: Q1 vermelho, Q2 azul, Q3 âmbar, Q4 cinza */
-const QUADRANT_STYLES: Record<
+/** Cores semânticas dos quadrantes — light/dark via opacidade */
+const QUADRANT_SX: Record<
   EisenhowerQuadrant,
-  { bg: string; label: string }
+  { box: object; labelColor: string }
 > = {
   1: {
-    bg: 'bg-red-100 dark:bg-red-950/50 border-red-200 dark:border-red-800/50',
-    label: 'text-red-800 dark:text-red-200',
+    box: {
+      bgcolor: 'rgba(220, 38, 38, 0.05)',
+      borderColor: 'rgba(220, 38, 38, 0.2)',
+    },
+    labelColor: '#DC2626',
   },
   2: {
-    bg: 'bg-blue-100 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800/50',
-    label: 'text-blue-800 dark:text-blue-200',
+    box: {
+      bgcolor: 'rgba(37, 99, 235, 0.05)',
+      borderColor: 'rgba(37, 99, 235, 0.2)',
+    },
+    labelColor: '#2563EB',
   },
   3: {
-    bg: 'bg-amber-100 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800/50',
-    label: 'text-amber-800 dark:text-amber-200',
+    box: {
+      bgcolor: 'rgba(217, 119, 6, 0.05)',
+      borderColor: 'rgba(217, 119, 6, 0.2)',
+    },
+    labelColor: '#D97706',
   },
   4: {
-    bg: 'bg-slate-100 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/50',
-    label: 'text-slate-600 dark:text-slate-400',
+    box: {
+      bgcolor: 'rgba(5, 150, 105, 0.05)',
+      borderColor: 'rgba(5, 150, 105, 0.2)',
+    },
+    labelColor: '#059669',
   },
 }
 
@@ -102,35 +114,60 @@ export function EisenhowerCanvas({
     e.dataTransfer.dropEffect = 'move'
   }
 
+  const borderRadii = {
+    1: { borderTopLeftRadius: 8 },
+    2: { borderTopRightRadius: 8 },
+    3: { borderBottomLeftRadius: 8 },
+    4: { borderBottomRightRadius: 8 },
+  }
+
   return (
-    <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-px bg-border">
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gridTemplateRows: '1fr 1fr',
+        height: '100%',
+        width: '100%',
+        gap: '1px',
+        bgcolor: 'divider',
+      }}
+    >
       {([1, 2, 3, 4] as EisenhowerQuadrant[]).map((q) => (
-        <div
+        <Box
           key={q}
           draggable={false}
           onDrop={(e) => handleDrop(e, q)}
           onDragOver={handleDragOver}
-          className={cn(
-            'relative min-h-0 overflow-hidden rounded-none border',
-            QUADRANT_STYLES[q].bg,
-            q === 1 && 'rounded-tl-lg',
-            q === 2 && 'rounded-tr-lg',
-            q === 3 && 'rounded-bl-lg',
-            q === 4 && 'rounded-br-lg'
-          )}
+          sx={{
+            position: 'relative',
+            minHeight: 0,
+            overflow: 'hidden',
+            border: '1px solid',
+            ...QUADRANT_SX[q].box,
+            ...borderRadii[q],
+          }}
         >
-          <div
-            className={cn(
-              'absolute left-2 top-2 z-0 text-xs font-medium',
-              QUADRANT_STYLES[q].label
-            )}
+          <Box
+            sx={{
+              position: 'absolute',
+              left: 12,
+              top: 12,
+              zIndex: 0,
+              color: QUADRANT_SX[q].labelColor,
+              fontWeight: 600,
+            }}
           >
-            <span className="block">{QUADRANT_LABELS[q].title}</span>
+            <Typography component="span" sx={{ display: 'block', fontSize: 12 }}>
+              {QUADRANT_LABELS[q].title}
+            </Typography>
             {QUADRANT_LABELS[q].sub && (
-              <span className="text-[10px] opacity-80">{QUADRANT_LABELS[q].sub}</span>
+              <Typography component="span" sx={{ fontSize: 10, opacity: 0.85, display: 'block', mt: 0.25 }}>
+                {QUADRANT_LABELS[q].sub}
+              </Typography>
             )}
-          </div>
-          <div className="absolute inset-0 p-2 pt-8">
+          </Box>
+          <Box sx={{ position: 'absolute', inset: 0, p: 1.5, pt: 7 }}>
             {byQuadrant[q].map(({ project, position }) => (
               <MapProjectBubble
                 key={project.id}
@@ -142,9 +179,9 @@ export function EisenhowerCanvas({
                 onClick={onProjectClick}
               />
             ))}
-          </div>
-        </div>
+          </Box>
+        </Box>
       ))}
-    </div>
+    </Box>
   )
 }

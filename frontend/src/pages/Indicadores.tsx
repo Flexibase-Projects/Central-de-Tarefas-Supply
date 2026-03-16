@@ -17,12 +17,12 @@ import {
 } from '@mui/material'
 import {
   People,
-  Comment,
+  MessageCircleIcon,
   CheckCircle,
   List,
   Folder,
-  Assignment,
-} from '@mui/icons-material'
+  ClipboardList,
+} from '@/components/ui/icons'
 import { useIndicators } from '@/hooks/use-indicators'
 import type { UserIndicator, ProjectIndicator, ActivityIndicator } from '@/types'
 import { useMemo } from 'react'
@@ -132,7 +132,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <People color="primary" sx={{ fontSize: 18 }} />
+              <People size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
                 Usuários
               </Typography>
@@ -145,7 +145,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <Folder color="primary" sx={{ fontSize: 18 }} />
+              <Folder size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
                 Projetos
               </Typography>
@@ -158,7 +158,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <Assignment color="primary" sx={{ fontSize: 18 }} />
+              <ClipboardList size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
                 Atividades
               </Typography>
@@ -171,7 +171,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <Comment color="primary" sx={{ fontSize: 18 }} />
+              <MessageCircleIcon size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
                 Comentários
               </Typography>
@@ -184,7 +184,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <List color="primary" sx={{ fontSize: 18 }} />
+              <List size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
                 TO-DOs criados
               </Typography>
@@ -197,7 +197,7 @@ export default function Indicadores() {
         <Card variant="outlined" sx={{ bgcolor: 'success.main', color: 'success.contrastText', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
-              <CheckCircle sx={{ fontSize: 18 }} />
+              <CheckCircle size={18} />
               <Typography variant="caption" sx={{ opacity: 0.95 }} fontWeight={600}>
                 TO-DOs concluídos
               </Typography>

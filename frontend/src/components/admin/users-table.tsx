@@ -1,32 +1,55 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Box,
   Button,
-  TextField,
+  Chip,
+  CircularProgress,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  FormControl,
-  Select,
-  MenuItem,
-  IconButton,
+  TextField,
   Typography,
-  CircularProgress,
-  Chip,
-  Paper,
 } from '@mui/material'
-import { Add, Edit, Delete, PersonAdd } from '@mui/icons-material'
+import { Plus, Pencil, Trash2, UserPlus } from '@/components/ui/icons'
 import { UserWithRole } from '@/types'
 import { useUsers } from '@/hooks/use-users'
 import { useRoles } from '@/hooks/use-roles'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+
+type AuthListUser = {
+  id: string
+  email: string
+  name: string
+  created_at: string
+  in_cdt: boolean
+}
+
+function getPreferredRoleId(roles: Array<{ id: string; name: string }>): string {
+  if (roles.length === 0) return ''
+
+  const memberLike = roles.find((role) =>
+    ['member', 'usuario', 'user', 'colaborador', 'employee'].includes(role.name.toLowerCase()),
+  )
+  if (memberLike) return memberLike.id
+
+  const firstNonAdmin = roles.find((role) => role.name.toLowerCase() !== 'admin')
+  if (firstNonAdmin) return firstNonAdmin.id
+
+  return roles[0]?.id ?? ''
+}
 
 export function UsersTable() {
   const {
@@ -41,11 +64,22 @@ export function UsersTable() {
     fetchAuthList,
     giveAccessFromAuth,
   } = useUsers()
+
   const { roles } = useRoles()
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null)
   const [formData, setFormData] = useState({ email: '', name: '', avatar_url: '' })
+
+  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false)
+  const [selectedAuthUser, setSelectedAuthUser] = useState<AuthListUser | null>(null)
+  const [selectedRoleId, setSelectedRoleId] = useState('')
   const [givingAccessId, setGivingAccessId] = useState<string | null>(null)
+
+  const roleItems = useMemo(
+    () => roles.map((role) => ({ id: role.id, name: role.name, display_name: role.display_name })),
+    [roles],
+  )
 
   useEffect(() => {
     fetchAuthList()
@@ -54,7 +88,7 @@ export function UsersTable() {
   const handleCreate = () => {
     setEditingUser(null)
     setFormData({ email: '', name: '', avatar_url: '' })
-    setIsDialogOpen(true)
+    setIsUserDialogOpen(true)
   }
 
   const handleEdit = (user: UserWithRole) => {
@@ -64,24 +98,24 @@ export function UsersTable() {
       name: user.name,
       avatar_url: user.avatar_url || '',
     })
-    setIsDialogOpen(true)
+    setIsUserDialogOpen(true)
   }
 
-  const handleSubmit = async () => {
+  const handleSubmitUser = async () => {
     try {
       if (editingUser) {
         await updateUser(editingUser.id, formData)
       } else {
         await createUser(formData)
       }
-      setIsDialogOpen(false)
+      setIsUserDialogOpen(false)
     } catch (error) {
       console.error('Error saving user:', error)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja desativar este usuário?')) {
+    if (confirm('Tem certeza que deseja desativar este usuario?')) {
       await deleteUser(id)
     }
   }
@@ -90,12 +124,34 @@ export function UsersTable() {
     await assignRole(userId, roleId)
   }
 
-  const handleGiveAccess = async (authUser: { id: string; email: string; name: string }) => {
-    setGivingAccessId(authUser.id)
+  const handleOpenGiveAccess = (authUser: AuthListUser) => {
+    setSelectedAuthUser(authUser)
+    setSelectedRoleId(getPreferredRoleId(roleItems))
+    setIsAccessDialogOpen(true)
+  }
+
+  const handleConfirmGiveAccess = async () => {
+    if (!selectedAuthUser) return
+    if (!selectedRoleId) {
+      alert('Selecione um cargo para liberar acesso.')
+      return
+    }
+
+    setGivingAccessId(selectedAuthUser.id)
     try {
-      await giveAccessFromAuth(authUser)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erro ao dar acesso')
+      await giveAccessFromAuth(
+        {
+          id: selectedAuthUser.id,
+          email: selectedAuthUser.email,
+          name: selectedAuthUser.name,
+        },
+        selectedRoleId,
+      )
+      setIsAccessDialogOpen(false)
+      setSelectedAuthUser(null)
+      setSelectedRoleId('')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao dar acesso')
     } finally {
       setGivingAccessId(null)
     }
@@ -111,14 +167,14 @@ export function UsersTable() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Usuários Supabase Auth — para dar acesso */}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1.5 }}>
-          Usuários do Supabase Auth
+          Usuarios do Supabase Auth
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Quem já tem conta no login. Use &quot;Dar acesso&quot; para liberar no sistema.
+          Quem ja possui conta de login. Libere acesso e defina o cargo no momento da aprovacao.
         </Typography>
+
         {authListLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress size={24} />
@@ -132,26 +188,31 @@ export function UsersTable() {
                   <TableCell sx={{ fontWeight: 600 }}>Nome</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Cadastro</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>Ação</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    Acao
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {authList.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} align="center" sx={{ py: 3 }}>
-                      <Typography color="text.secondary">Nenhum usuário no Supabase Auth</Typography>
+                      <Typography color="text.secondary">Nenhum usuario encontrado no Auth.</Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
                   authList.map((authUser) => (
                     <TableRow key={authUser.id} hover>
                       <TableCell>{authUser.email}</TableCell>
-                      <TableCell>{authUser.name || '—'}</TableCell>
+                      <TableCell>{authUser.name || '-'}</TableCell>
                       <TableCell>
                         <Typography variant="caption" color="text.secondary">
                           {authUser.created_at
-                            ? formatDistanceToNow(new Date(authUser.created_at), { addSuffix: true, locale: ptBR })
-                            : '—'}
+                            ? formatDistanceToNow(new Date(authUser.created_at), {
+                                addSuffix: true,
+                                locale: ptBR,
+                              })
+                            : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -164,16 +225,18 @@ export function UsersTable() {
                       </TableCell>
                       <TableCell align="right">
                         {authUser.in_cdt ? (
-                          <Typography variant="caption" color="text.secondary">Já no sistema</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Ja no sistema
+                          </Typography>
                         ) : (
                           <Button
                             size="small"
                             variant="outlined"
-                            startIcon={givingAccessId === authUser.id ? <CircularProgress size={14} /> : <PersonAdd />}
-                            disabled={givingAccessId !== null}
-                            onClick={() => handleGiveAccess(authUser)}
+                            startIcon={<UserPlus size={18} />}
+                            disabled={Boolean(givingAccessId)}
+                            onClick={() => handleOpenGiveAccess(authUser)}
                           >
-                            Dar acesso
+                            Liberar acesso
                           </Button>
                         )}
                       </TableCell>
@@ -186,11 +249,12 @@ export function UsersTable() {
         )}
       </Paper>
 
-      {/* Usuários com acesso no sistema */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6" fontWeight={600}>Usuários com acesso</Typography>
-        <Button variant="contained" size="small" onClick={handleCreate} startIcon={<Add />}>
-          Novo Usuário
+        <Typography variant="h6" fontWeight={600}>
+          Usuarios com acesso
+        </Typography>
+        <Button variant="contained" size="small" onClick={handleCreate} startIcon={<Plus size={20} />}>
+          Novo Usuario
         </Button>
       </Box>
 
@@ -202,31 +266,39 @@ export function UsersTable() {
               <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Cargo</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Ações</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>
+                Acoes
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">Nenhum usuário encontrado</Typography>
+                  <Typography color="text.secondary">Nenhum usuario encontrado</Typography>
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
                 <TableRow key={user.id} hover>
                   <TableCell sx={{ fontWeight: 500 }}>{user.name}</TableCell>
-                  <TableCell><Typography variant="body2" color="text.secondary">{user.email}</Typography></TableCell>
                   <TableCell>
-                    <FormControl size="small" sx={{ minWidth: 140 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {user.email}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <FormControl size="small" sx={{ minWidth: 170 }}>
                       <Select
                         value={user.role?.id || ''}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        onChange={(e) => handleRoleChange(user.id, String(e.target.value))}
                         displayEmpty
                       >
                         <MenuItem value="">Sem cargo</MenuItem>
                         {roles.map((role) => (
-                          <MenuItem key={role.id} value={role.id}>{role.display_name}</MenuItem>
+                          <MenuItem key={role.id} value={role.id}>
+                            {role.display_name}
+                          </MenuItem>
                         ))}
                       </Select>
                     </FormControl>
@@ -240,8 +312,12 @@ export function UsersTable() {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => handleEdit(user)}><Edit fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(user.id)}><Delete fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={() => handleEdit(user)}>
+                      <Pencil size={20} />
+                    </IconButton>
+                    <IconButton size="small" color="error" onClick={() => handleDelete(user.id)}>
+                      <Trash2 size={20} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               ))
@@ -250,8 +326,8 @@ export function UsersTable() {
         </Table>
       </Box>
 
-      <Dialog open={isDialogOpen} onClose={() => setIsDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
+      <Dialog open={isUserDialogOpen} onClose={() => setIsUserDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>{editingUser ? 'Editar Usuario' : 'Novo Usuario'}</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
@@ -259,28 +335,73 @@ export function UsersTable() {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="usuario@exemplo.com"
               fullWidth
             />
             <TextField
               label="Nome"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Nome completo"
               fullWidth
             />
             <TextField
               label="Avatar URL (opcional)"
               value={formData.avatar_url}
               onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-              placeholder="https://exemplo.com/avatar.jpg"
               fullWidth
             />
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSubmit}>Salvar</Button>
+          <Button onClick={() => setIsUserDialogOpen(false)}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSubmitUser}>
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={isAccessDialogOpen}
+        onClose={() => setIsAccessDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Liberar acesso</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              {selectedAuthUser
+                ? `Usuario: ${selectedAuthUser.name || '-'} (${selectedAuthUser.email})`
+                : 'Selecione um usuario'}
+            </Typography>
+
+            <FormControl fullWidth size="small">
+              <InputLabel>Cargo inicial</InputLabel>
+              <Select
+                label="Cargo inicial"
+                value={selectedRoleId}
+                onChange={(e) => setSelectedRoleId(String(e.target.value))}
+              >
+                {roles.map((role) => (
+                  <MenuItem key={role.id} value={role.id}>
+                    {role.display_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setIsAccessDialogOpen(false)} disabled={Boolean(givingAccessId)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleConfirmGiveAccess}
+            disabled={!selectedAuthUser || !selectedRoleId || Boolean(givingAccessId)}
+            startIcon={givingAccessId ? <CircularProgress size={14} /> : <UserPlus size={16} />}
+          >
+            Confirmar
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, CircularProgress, Typography, Paper } from '@mui/material'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import { useProjects } from '@/hooks/use-projects'
 import { ProjectCardDialog } from '@/components/kanban/project-card-dialog'
 import { EisenhowerCanvas } from '@/components/mapa/eisenhower-canvas'
@@ -29,30 +29,85 @@ export default function Mapa() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress size={40} />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          p: 3,
+        }}
+      >
+        <CircularProgress size={40} sx={{ color: 'primary.main' }} />
+        <Typography variant="body2" color="text.secondary">
+          Carregando mapa...
+        </Typography>
       </Box>
     )
   }
 
   if (error) {
     return (
-      <Box sx={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', p: 3 }}>
-        <Typography color="error">{error}</Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3,
+          gap: 1,
+        }}
+      >
+        <Typography color="error" fontWeight={600}>
+          Erro ao carregar o mapa
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {error}
+        </Typography>
       </Box>
     )
   }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <Box sx={{ flex: 1, minHeight: 0, p: 1 }}>
-        <Paper variant="outlined" sx={{ height: '100%', overflow: 'hidden', borderRadius: 1 }}>
+      <Box sx={{ flexShrink: 0, px: 3, pt: 2.5, pb: 1.5 }}>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            color: 'text.primary',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          Mapa
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+          Matriz de Eisenhower — organize projetos por urgência e importância.
+        </Typography>
+      </Box>
+      <Box sx={{ flex: 1, minHeight: 0, px: 3, pb: 3 }}>
+        <Box
+          sx={{
+            height: '100%',
+            overflow: 'hidden',
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            boxShadow: (theme) => theme.palette.mode === 'light'
+              ? '0 4px 12px rgba(15,23,42,0.06)'
+              : '0 4px 12px rgba(0,0,0,0.2)',
+          }}
+        >
           <EisenhowerCanvas
             projects={projects}
             onProjectClick={handleProjectClick}
             onPositionChange={handlePositionChange}
           />
-        </Paper>
+        </Box>
       </Box>
       <ProjectCardDialog
         project={selectedProject}

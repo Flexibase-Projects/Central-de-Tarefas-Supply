@@ -11,6 +11,10 @@ import Mapa from './pages/Mapa'
 import Prioridades from './pages/Prioridades'
 import Indicadores from './pages/Indicadores'
 import CanvaEquipe from './pages/CanvaEquipe'
+import Perfil from './pages/Perfil'
+import Conquistas from './pages/Conquistas'
+import Niveis from './pages/Niveis'
+import Tutorial from './pages/Tutorial'
 
 function App() {
   return (
@@ -31,6 +35,10 @@ function App() {
                     <Route path="/atividades" element={<Atividades />} />
                     <Route path="/canva-equipe" element={<CanvaEquipe />} />
                     <Route path="/indicadores" element={<Indicadores />} />
+                    <Route path="/perfil" element={<Perfil />} />
+                    <Route path="/conquistas" element={<Conquistas />} />
+                    <Route path="/niveis" element={<Niveis />} />
+                    <Route path="/tutorial" element={<Tutorial />} />
                     <Route path="/admin" element={<Admin />} />
                   </Routes>
                 </MainLayout>

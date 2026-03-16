@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Project } from '@/types';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, CardContent, Box, Typography } from '@mui/material';
-import { Person, CheckBox } from '@mui/icons-material';
+import { Card, CardContent, Box, Typography, useTheme } from '@mui/material';
+import { Person, CheckSquare } from '@/components/ui/icons';
 
 function GitHubIconSmall() {
   const size = 12;
@@ -13,6 +13,7 @@ function GitHubIconSmall() {
     </svg>
   );
 }
+
 import { useGitHub } from '@/hooks/use-github';
 import { useTodos } from '@/hooks/use-todos';
 import { useUsersList } from '@/hooks/use-users-list';
@@ -23,13 +24,13 @@ interface KanbanCardProps {
   onClick?: () => void;
 }
 
-// Paleta mínima: barra lateral fina por status (tons suaves)
+/** Barra lateral de status — cores semânticas */
 const STATUS_STRIPE: Record<string, string> = {
-  backlog: '#94a3b8',
-  todo: '#3b82f6',
-  in_progress: '#f59e0b',
-  review: '#8b5cf6',
-  done: '#10b981',
+  backlog:     '#94A3B8', // slate-400
+  todo:        '#2563EB', // blue-600
+  in_progress: '#D97706', // amber-600
+  review:      '#7C3AED', // violet-700
+  done:        '#059669', // emerald-600
 };
 
 export function KanbanCard({ project, onClick }: KanbanCardProps) {
@@ -37,6 +38,8 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
   const { getCommitsCount } = useGitHub();
   const { todos } = useTodos(project.id);
   const { users } = useUsersList();
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
   const [commitsCount, setCommitsCount] = useState<number | null>(null);
   const [online, setOnline] = useState<boolean | null>(null);
 
@@ -51,10 +54,7 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
   }, [project.github_url, getCommitsCount]);
 
   useEffect(() => {
-    if (!project.project_url) {
-      setOnline(null);
-      return;
-    }
+    if (!project.project_url) { setOnline(null); return; }
     const base = getApiBase();
     const url = base
       ? `${base}/api/projects/health-check?url=${encodeURIComponent(project.project_url)}`
@@ -85,10 +85,7 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
   const style = { transform: CSS.Transform.toString(transform), transition };
   const displayNumber = commitsCount !== null ? commitsCount : 0;
   const stripeColor = STATUS_STRIPE[project.status] || STATUS_STRIPE.backlog;
-
-  const dotColor =
-    !project.project_url ? '#cbd5e1' : online === true ? '#10b981' : online === false ? '#ef4444' : '#cbd5e1';
-
+  const dotColor = !project.project_url ? '#94A3B8' : online === true ? '#059669' : online === false ? '#EF4444' : '#94A3B8';
   const hasCover = Boolean(project.cover_image_url);
 
   return (
@@ -103,24 +100,22 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
         cursor: 'grab',
         '&:active': { cursor: 'grabbing' },
         position: 'relative',
-        border: '1px solid',
-        borderColor: 'divider',
+        border: `1px solid ${theme.palette.divider}`,
+        opacity: isDragging ? 0.45 : 1,
         bgcolor: 'background.paper',
-        opacity: isDragging ? 0.5 : 1,
-        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
-        '&:hover': {
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-          borderColor: 'action.selected',
-        },
+        color: 'text.primary',
         overflow: 'hidden',
+        boxShadow: isLight
+          ? '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.03)'
+          : '0 1px 3px rgba(0,0,0,0.2)',
       }}
     >
-      {/* Imagem de capa (estilo Trello) */}
+      {/* Imagem de capa */}
       {hasCover && (
         <Box
           sx={{
             width: '100%',
-            height: 100,
+            height: 96,
             backgroundImage: `url(${project.cover_image_url})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -128,44 +123,39 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
           }}
         />
       )}
-      {/* Barra de status (indicador visual discreto) */}
+
+      {/* Barra de status */}
       <Box
         sx={{
           position: 'absolute',
           left: 0,
-          top: hasCover ? 100 : 0,
+          top: hasCover ? 96 : 0,
           bottom: 0,
-          width: 4,
-          borderRight: '1px solid',
-          borderColor: 'divider',
+          width: 3,
           bgcolor: stripeColor,
           borderRadius: hasCover ? 0 : '8px 0 0 8px',
         }}
       />
+
       <CardContent sx={{ pl: 2.5, py: 1.5, pr: 1.5, '&:last-child': { pb: 1.5 } }}>
+        {/* Header: dot + título + github badge */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
           <Box
             sx={{
               flexShrink: 0,
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               borderRadius: '50%',
               bgcolor: dotColor,
-              border: '1.5px solid',
-              borderColor: 'background.paper',
-              boxShadow: 1,
+              border: `1.5px solid ${theme.palette.background.paper}`,
             }}
             title={
               project.project_url
-                ? online === true
-                  ? 'Online'
-                  : online === false
-                    ? 'Offline'
-                    : 'Verificando...'
+                ? online === true ? 'Online' : online === false ? 'Offline' : 'Verificando...'
                 : 'Link não configurado'
             }
           />
-          <Typography variant="subtitle2" fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="subtitle2" fontWeight={600} noWrap sx={{ flex: 1, minWidth: 0, fontSize: 13 }}>
             {project.name}
           </Typography>
           {project.github_url && (
@@ -176,39 +166,41 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
                 alignItems: 'center',
                 gap: 0.5,
                 height: 20,
-                px: 1,
+                px: 0.875,
                 borderRadius: 1,
-                bgcolor: 'action.hover',
-                border: '1px solid',
-                borderColor: 'divider',
+                bgcolor: isLight ? '#F1F5F9' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${theme.palette.divider}`,
                 color: 'text.secondary',
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', color: 'inherit' }}>
-                <GitHubIconSmall />
-              </Box>
+              <GitHubIconSmall />
               <Typography component="span" variant="caption" fontWeight={600} sx={{ fontSize: 11, lineHeight: 1 }}>
                 {commitsCount !== null ? String(displayNumber).padStart(2, '0') : '--'}
               </Typography>
             </Box>
           )}
         </Box>
+
+        {/* Descrição */}
         {project.description && (
           <Typography
             variant="caption"
             color="text.secondary"
             sx={{
-              mt: 0.25,
+              mt: 0.5,
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              lineHeight: 1.35,
+              lineHeight: 1.4,
+              fontSize: 12,
             }}
           >
             {project.description}
           </Typography>
         )}
+
+        {/* Tarefas pendentes por responsável */}
         {pendingTodos.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1 }}>
             {assigneesWithCounts.map((a) => (
@@ -218,20 +210,19 @@ export function KanbanCard({ project, onClick }: KanbanCardProps) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 0.75,
-                  px: 1,
-                  py: 0.5,
+                  px: 0.875,
+                  py: 0.375,
                   borderRadius: 1,
-                  bgcolor: 'action.hover',
-                  border: '1px solid',
-                  borderColor: 'divider',
+                  bgcolor: isLight ? '#F8FAFC' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${theme.palette.divider}`,
                 }}
               >
-                <CheckBox sx={{ fontSize: 14, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary">
+                <CheckSquare size={12} style={{ color: theme.palette.text.secondary, flexShrink: 0 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
                   {a.count} pendente{a.count !== 1 ? 's' : ''}
                 </Typography>
-                <Person sx={{ fontSize: 12, color: 'text.secondary' }} />
-                <Typography variant="caption" color="text.secondary" noWrap>
+                <Person size={11} style={{ color: theme.palette.text.disabled, flexShrink: 0 }} />
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: 11 }}>
                   {a.userName}
                 </Typography>
               </Box>

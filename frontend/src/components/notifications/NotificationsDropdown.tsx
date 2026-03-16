@@ -10,7 +10,7 @@ import {
   Badge,
   Paper,
 } from '@mui/material'
-import { Notifications as NotificationsIcon, Check, DoneAll } from '@mui/icons-material'
+import { Bell, Check, CheckCheck } from '@/components/ui/icons'
 import { useNotifications } from '@/hooks/use-notifications'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -134,7 +134,7 @@ export function NotificationsDropdown() {
               color="error"
               max={99}
             >
-              <NotificationsIcon />
+              <Bell size={24} />
             </Badge>
           </IconButton>
         </Tooltip>
@@ -179,7 +179,7 @@ export function NotificationsDropdown() {
               <Button
                 size="small"
                 variant="text"
-                startIcon={<DoneAll sx={{ fontSize: 16 }} />}
+                startIcon={<CheckCheck size={16} />}
                 onClick={markAllAsRead}
                 sx={{ textTransform: 'none', fontWeight: 600 }}
               >
@@ -197,7 +197,7 @@ export function NotificationsDropdown() {
             </Box>
           ) : notifications.length === 0 ? (
             <Box sx={{ py: 6, px: 3, textAlign: 'center' }}>
-              <NotificationsIcon sx={{ fontSize: 48, color: 'action.disabled', mb: 1 }} />
+              <Bell size={48} style={{ marginBottom: 8 }} />
               <Typography variant="body2" color="text.secondary">
                 Nenhuma notificação
               </Typography>
@@ -319,7 +319,7 @@ function NotificationItem({
             sx={{ flexShrink: 0, color: 'primary.main' }}
             title="Marcar como lida"
           >
-            <Check fontSize="small" />
+            <Check size={20} />
           </IconButton>
         )}
       </Box>

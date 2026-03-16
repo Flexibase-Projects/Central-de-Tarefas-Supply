@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase.js';
 import { Role, Permission } from '../types/index.js';
+import { isNativeAdminUserId } from './native-admin.js';
 
 /**
  * Verifica se um usuário tem uma permissão específica
@@ -124,6 +125,11 @@ export async function getUserPermissions(userId: string): Promise<Permission[]> 
  */
 export async function hasRole(userId: string, roleName: string): Promise<boolean> {
   try {
+    if (roleName === 'admin') {
+      const nativeAdmin = await isNativeAdminUserId(userId);
+      if (nativeAdmin) return true;
+    }
+
     const { data, error } = await supabase
       .from('cdt_user_roles')
       .select(`

@@ -17,7 +17,7 @@ import {
   CircularProgress,
   Chip,
 } from '@mui/material'
-import { Add, Edit, Delete, Settings } from '@mui/icons-material'
+import { Plus, Pencil, Trash2, Settings } from '@/components/ui/icons'
 import { RoleWithPermissions, useRoles } from '@/hooks/use-roles'
 import { RolePermissionsEditor } from './role-permissions-editor'
 
@@ -81,7 +81,7 @@ export function RolesTable() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6" fontWeight={600}>Cargos</Typography>
-        <Button variant="contained" size="small" onClick={handleCreate} startIcon={<Add />}>
+        <Button variant="contained" size="small" onClick={handleCreate} startIcon={<Plus size={20} />}>
           Novo Cargo
         </Button>
       </Box>
@@ -113,8 +113,8 @@ export function RolesTable() {
                   </TableCell>
                   <TableCell align="right">
                     <IconButton size="small" onClick={() => handleManagePermissions(role)} title="Permissões"><Settings fontSize="small" /></IconButton>
-                    <IconButton size="small" onClick={() => handleEdit(role)}><Edit fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(role.id)}><Delete fontSize="small" /></IconButton>
+                    <IconButton size="small" onClick={() => handleEdit(role)}><Pencil size={20} /></IconButton>
+                    <IconButton size="small" color="error" onClick={() => handleDelete(role.id)}><Trash2 size={20} /></IconButton>
                   </TableCell>
                 </TableRow>
               ))

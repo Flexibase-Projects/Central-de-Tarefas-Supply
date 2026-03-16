@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { Box, CircularProgress, Fab, Typography } from '@mui/material'
-import { Add } from '@mui/icons-material'
+import { Plus } from '@/components/ui/icons'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { ActivityCardDialog } from '@/components/kanban/activity-card-dialog'
 import { CreateActivityDialog } from '@/components/kanban/create-activity-dialog'
 import { useActivities } from '@/hooks/use-activities'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { RequirePermission } from '@/components/auth/RequirePermission'
+import { usePermissions } from '@/hooks/use-permissions'
 import { Activity } from '@/types'
 import { Project } from '@/types'
 
 export default function Atividades() {
   const { activities, loading, createActivity, updateActivity, moveActivity } = useActivities()
+  const { hasRole } = usePermissions()
+  const isAdmin = hasRole('admin')
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
@@ -32,6 +34,7 @@ export default function Atividades() {
   }))
 
   const handleProjectClick = (project: Project) => {
+    if (!isAdmin) return
     const activity = activities.find((a) => a.id === project.id)
     if (activity) {
       setSelectedActivity(activity)
@@ -91,16 +94,16 @@ export default function Atividades() {
           />
         </Box>
 
-        <RequirePermission permission="move_card">
+        {isAdmin && (
           <Fab
             color="primary"
             aria-label="Nova Atividade"
             onClick={() => setIsCreateDialogOpen(true)}
             sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1200 }}
           >
-            <Add />
+            <Plus size={24} />
           </Fab>
-        </RequirePermission>
+        )}
 
         <CreateActivityDialog
           open={isCreateDialogOpen}

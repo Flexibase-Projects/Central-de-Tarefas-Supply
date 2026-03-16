@@ -1,8 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/supabase.js';
+import { ensureNativeAdminAccess } from '../services/native-admin.js';
 
-/** Define em req o id do usuário autenticado (x-user-id) a partir do JWT do Supabase Auth. */
-export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+type AuthRequest = Request & {
+  userId?: string;
+  authUserId?: string;
+  authUserEmail?: string;
+};
+
+/**
+ * Resolves authenticated user context from Supabase JWT.
+ * - `authUserId` / `authUserEmail`: any valid Supabase Auth user.
+ * - `userId` / `x-user-id`: only users with access in `cdt_users`.
+ */
+export async function authMiddleware(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -12,48 +27,65 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
 
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+
     if (error || !user) {
       next();
       return;
     }
 
-    // Resolver cdt_users: prioridade por id (auth = cdt) e depois por email (conta já existente)
-    const byId = await supabase.from('cdt_users').select('id').eq('id', user.id).single();
-    if (byId.data?.id) {
-      (req as Request & { userId?: string }).userId = byId.data.id;
+    const authReq = req as AuthRequest;
+    authReq.authUserId = user.id;
+    authReq.authUserEmail = user.email ?? '';
+
+    // Access already granted by id.
+    const byId = await supabase.from('cdt_users').select('id').eq('id', user.id).maybeSingle();
+    if (!byId.error && byId.data?.id) {
+      authReq.userId = byId.data.id;
       req.headers['x-user-id'] = byId.data.id;
       next();
       return;
     }
+
+    // Access already granted by email (legacy user rows).
     if (user.email) {
-      const byEmail = await supabase.from('cdt_users').select('id').eq('email', user.email).maybeSingle();
-      if (byEmail.data?.id) {
-        (req as Request & { userId?: string }).userId = byEmail.data.id;
+      const byEmail = await supabase
+        .from('cdt_users')
+        .select('id')
+        .eq('email', user.email)
+        .maybeSingle();
+      if (!byEmail.error && byEmail.data?.id) {
+        authReq.userId = byEmail.data.id;
         req.headers['x-user-id'] = byEmail.data.id;
         next();
         return;
       }
     }
 
-    // Novo usuário: criar em cdt_users com id do auth (evita conflito de email)
-    const name = (user.user_metadata?.full_name as string) || (user.user_metadata?.name as string) || user.email?.split('@')[0] || 'Usuário';
-    const { error: insertError } = await supabase.from('cdt_users').insert({
-      id: user.id,
-      email: user.email ?? '',
-      name,
-      avatar_url: user.user_metadata?.avatar_url ?? null,
-      is_active: true,
+    // Automatic access only for native admin emails.
+    const resolvedName =
+      (user.user_metadata?.full_name as string) ||
+      (user.user_metadata?.name as string) ||
+      user.email?.split('@')[0] ||
+      'Usuario';
+
+    const nativeAdminUserId = await ensureNativeAdminAccess({
+      authUserId: user.id,
+      email: user.email,
+      name: resolvedName,
+      avatarUrl: (user.user_metadata?.avatar_url as string | null) ?? null,
     });
-    if (insertError) {
-      console.warn('[auth] Falha ao criar cdt_users para', user.id, insertError.message);
-      next();
-      return;
+
+    if (nativeAdminUserId) {
+      authReq.userId = nativeAdminUserId;
+      req.headers['x-user-id'] = nativeAdminUserId;
     }
-    (req as Request & { userId?: string }).userId = user.id;
-    req.headers['x-user-id'] = user.id;
   } catch {
-    // Ignora erro (token inválido, etc.) e segue sem usuário
+    // Ignore auth errors and continue as unauthenticated for app-level handling.
   }
+
   next();
 }

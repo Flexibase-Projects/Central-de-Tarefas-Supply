@@ -1,18 +1,59 @@
-import express from 'express';
+﻿import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { Activity } from '../types/index.js';
+import { hasRole } from '../services/permissions.js';
+import {
+  awardActivityCompletionXp,
+  calculateItemCompletionXp,
+  evaluateAndAwardGlobalAchievements,
+  getLinkedAchievementReward,
+  unlockLinkedAchievementIfNeeded,
+} from '../services/gamification.js';
 
 const router = express.Router();
 const ACTIVITY_COVERS_BUCKET = 'activity-covers';
 
+const VALID_STATUSES = ['backlog', 'todo', 'in_progress', 'review', 'done'];
+const VALID_PRIORITIES = ['low', 'medium', 'high'];
+
+function getRequesterId(req: express.Request): string | null {
+  return (
+    ((req as express.Request & { userId?: string }).userId ?? null) ||
+    (req.headers['x-user-id'] as string | undefined) ||
+    null
+  );
+}
+
+function parseDecimal(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return Number(parsed.toFixed(2));
+  }
+  return fallback;
+}
+
+async function ensureAdmin(req: express.Request, res: express.Response): Promise<string | null> {
+  const requesterId = getRequesterId(req);
+  if (!requesterId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return null;
+  }
+  const isAdmin = await hasRole(requesterId, 'admin');
+  if (!isAdmin) {
+    res.status(403).json({ error: 'Only admins can perform this action.' });
+    return null;
+  }
+  return requesterId;
+}
+
 // Get all activities
-router.get('/', async (req, res) => {
+router.get('/', async (_req, res) => {
   try {
-    // Check if Supabase is configured
     if (!process.env.SUPABASE_URL || (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_ANON_KEY)) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'Supabase not configured',
-        message: 'Please configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY in backend/.env'
+        message: 'Please configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY in backend/.env',
       });
     }
 
@@ -40,9 +81,7 @@ router.get('/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
-    if (!data) {
-      return res.status(404).json({ error: 'Activity not found' });
-    }
+    if (!data) return res.status(404).json({ error: 'Activity not found' });
     res.json(data);
   } catch (error: any) {
     console.error('Error fetching activity:', error);
@@ -50,97 +89,127 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new activity
+// Create new activity (admin only)
 router.post('/', async (req, res) => {
   try {
-    // Check if Supabase is configured
+    const requesterId = await ensureAdmin(req, res);
+    if (!requesterId) return;
+
     if (!process.env.SUPABASE_URL || (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_ANON_KEY)) {
-      return res.status(503).json({ 
+      return res.status(503).json({
         error: 'Supabase not configured',
-        message: 'Please configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY in backend/.env'
+        message: 'Please configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY in backend/.env',
       });
     }
 
-    const activity: Partial<Activity> = req.body;
-    console.log('Creating activity with data:', activity);
-    
-    // Validar status se fornecido
-    const validStatuses = ['backlog', 'todo', 'in_progress', 'review', 'done'];
-    if (activity.status && !validStatuses.includes(activity.status)) {
-      return res.status(400).json({ 
-        error: 'Invalid status',
-        message: `Status must be one of: ${validStatuses.join(', ')}`
-      });
+    const activity: Partial<Activity> & {
+      xp_reward?: number;
+      deadline_bonus_percent?: number;
+      achievement_id?: string | null;
+    } = req.body;
+
+    if (activity.status && !VALID_STATUSES.includes(activity.status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    if (activity.priority && !VALID_PRIORITIES.includes(activity.priority)) {
+      return res.status(400).json({ error: 'Invalid priority' });
     }
 
-    // Validar priority se fornecido
-    const validPriorities = ['low', 'medium', 'high'];
-    if (activity.priority && !validPriorities.includes(activity.priority)) {
-      return res.status(400).json({ 
-        error: 'Invalid priority',
-        message: `Priority must be one of: ${validPriorities.join(', ')}`
-      });
-    }
-    
+    const isDone = (activity.status || 'backlog') === 'done';
+
     const { data, error } = await supabase
       .from('cdt_activities')
-      .insert([{
-        name: activity.name,
-        description: activity.description || null,
-        status: activity.status || 'backlog',
-        due_date: activity.due_date || null,
-        priority: activity.priority || 'medium',
-        assigned_to: activity.assigned_to || null,
-        cover_image_url: activity.cover_image_url ?? null,
-        created_by: activity.created_by || null,
-      }])
+      .insert([
+        {
+          name: activity.name,
+          description: activity.description || null,
+          status: activity.status || 'backlog',
+          due_date: activity.due_date || null,
+          priority: activity.priority || 'medium',
+          assigned_to: activity.assigned_to || null,
+          cover_image_url: activity.cover_image_url ?? null,
+          created_by: activity.created_by || requesterId,
+          xp_reward: parseDecimal(activity.xp_reward, 1),
+          deadline_bonus_percent: parseDecimal(activity.deadline_bonus_percent, 0),
+          achievement_id: activity.achievement_id || null,
+          completed_at: isDone ? new Date().toISOString() : null,
+        },
+      ])
       .select()
       .single();
 
-    if (error) {
-      console.error('Supabase error creating activity:', error);
-      throw error;
+    if (error) throw error;
+
+    if (isDone) {
+      const earnerId = data.assigned_to || data.created_by;
+      if (earnerId) {
+        const linkedReward = await getLinkedAchievementReward(data.achievement_id ?? null);
+        const completedAt = data.completed_at ? new Date(data.completed_at) : new Date();
+        const onDeadline =
+          Boolean(data.due_date) && completedAt.getTime() <= new Date(data.due_date as string).getTime();
+        const xpAmount = calculateItemCompletionXp({
+          baseXp: parseDecimal(data.xp_reward, 1),
+          onDeadline,
+          deadlineBonusPercent: parseDecimal(data.deadline_bonus_percent, 0),
+          linkedAchievementFixedXp: linkedReward.fixedXp,
+          linkedAchievementPercent: linkedReward.percent,
+        });
+
+        const awarded = await awardActivityCompletionXp({
+          userId: earnerId,
+          activityId: data.id,
+          xpAmount,
+        });
+        await unlockLinkedAchievementIfNeeded(earnerId, data.achievement_id ?? null);
+        if (awarded) {
+          await evaluateAndAwardGlobalAchievements(earnerId);
+        }
+      }
     }
-    
-    console.log('Activity created successfully:', data);
+
     res.status(201).json(data);
   } catch (error: any) {
     console.error('Error creating activity:', error);
-    res.status(500).json({ 
-      error: error.message || 'Failed to create activity',
-      details: error.details || error.hint || null
-    });
+    res.status(500).json({ error: error.message || 'Failed to create activity' });
   }
 });
 
-// Upload cover image (backend uses SERVICE_ROLE so bucket doesn't need client policies)
+// Upload cover image (admin only)
 router.post('/:id/cover', async (req, res) => {
   try {
+    const requesterId = await ensureAdmin(req, res);
+    if (!requesterId) return;
+
     const { id } = req.params;
     const { image } = req.body as { image?: string };
     if (!image || typeof image !== 'string') {
       return res.status(400).json({ error: 'Body must include { image: "data:image/...;base64,..." }' });
     }
+
     const match = image.match(/^data:image\/(\w+);base64,(.+)$/);
     const ext = match ? (match[1] === 'jpeg' ? 'jpg' : match[1]) : 'jpg';
     const base64Data = match ? match[2] : image;
+
     let buffer: Buffer;
     try {
       buffer = Buffer.from(base64Data, 'base64');
     } catch {
       return res.status(400).json({ error: 'Invalid base64 image' });
     }
-    const MAX_COVER_BYTES = 10 * 1024 * 1024; // 10MB
-    if (buffer.length > MAX_COVER_BYTES) {
-      return res.status(413).json({ error: 'Imagem muito grande. O tamanho máximo é 10MB.' });
+
+    const maxCoverBytes = 10 * 1024 * 1024;
+    if (buffer.length > maxCoverBytes) {
+      return res.status(413).json({ error: 'Image too large. Maximum is 10MB.' });
     }
+
     const path = `${id}/cover-${Date.now()}.${ext}`;
     const contentType = match ? `image/${match[1]}` : 'image/jpeg';
-    const { error: uploadError } = await supabase.storage.from(ACTIVITY_COVERS_BUCKET).upload(path, buffer, {
-      upsert: true,
-      contentType,
-    });
+
+    const { error: uploadError } = await supabase.storage
+      .from(ACTIVITY_COVERS_BUCKET)
+      .upload(path, buffer, { upsert: true, contentType });
     if (uploadError) throw uploadError;
+
     const { data } = supabase.storage.from(ACTIVITY_COVERS_BUCKET).getPublicUrl(path);
     res.json({ url: data.publicUrl });
   } catch (error: any) {
@@ -152,29 +221,55 @@ router.post('/:id/cover', async (req, res) => {
 // Update activity
 router.put('/:id', async (req, res) => {
   try {
+    const requesterId = getRequesterId(req);
+    if (!requesterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const { id } = req.params;
-    const updates: Partial<Activity> = req.body;
+    const updates: Partial<Activity> & {
+      xp_reward?: number;
+      deadline_bonus_percent?: number;
+      achievement_id?: string | null;
+    } = req.body;
+    const isAdmin = await hasRole(requesterId, 'admin');
+    const incomingKeys = Object.keys(req.body as Record<string, unknown>);
 
-    // Validar status se fornecido
-    const validStatuses = ['backlog', 'todo', 'in_progress', 'review', 'done'];
-    if (updates.status && !validStatuses.includes(updates.status)) {
-      return res.status(400).json({ 
-        error: 'Invalid status',
-        message: `Status must be one of: ${validStatuses.join(', ')}`
-      });
+    if (updates.status && !VALID_STATUSES.includes(updates.status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    if (updates.priority && !VALID_PRIORITIES.includes(updates.priority)) {
+      return res.status(400).json({ error: 'Invalid priority' });
     }
 
-    // Validar priority se fornecido
-    const validPriorities = ['low', 'medium', 'high'];
-    if (updates.priority && !validPriorities.includes(updates.priority)) {
-      return res.status(400).json({ 
-        error: 'Invalid priority',
-        message: `Priority must be one of: ${validPriorities.join(', ')}`
-      });
+    const { data: currentActivity, error: currentError } = await supabase
+      .from('cdt_activities')
+      .select(
+        'id, name, status, due_date, assigned_to, created_by, xp_reward, deadline_bonus_percent, achievement_id, completed_at',
+      )
+      .eq('id', id)
+      .single();
+
+    if (currentError) throw currentError;
+    if (!currentActivity) {
+      return res.status(404).json({ error: 'Activity not found' });
     }
 
-    // Preparar update apenas com campos válidos
-    const updateData: any = {
+    if (!isAdmin) {
+      const onlyStatusUpdate =
+        incomingKeys.length === 1 &&
+        incomingKeys.includes('status') &&
+        typeof updates.status === 'string';
+
+      if (!onlyStatusUpdate) {
+        return res.status(403).json({ error: 'Only admins can edit activity configuration.' });
+      }
+      if (currentActivity.assigned_to !== requesterId) {
+        return res.status(403).json({ error: 'You can only update activities assigned to you.' });
+      }
+    }
+
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
 
@@ -186,17 +281,36 @@ router.put('/:id', async (req, res) => {
     if (updates.assigned_to !== undefined) updateData.assigned_to = updates.assigned_to;
     if (updates.cover_image_url !== undefined) updateData.cover_image_url = updates.cover_image_url;
 
-    let { data, error } = await supabase
+    if (isAdmin) {
+      if (updates.xp_reward !== undefined) updateData.xp_reward = parseDecimal(updates.xp_reward, 1);
+      if (updates.deadline_bonus_percent !== undefined) {
+        updateData.deadline_bonus_percent = parseDecimal(updates.deadline_bonus_percent, 0);
+      }
+      if (updates.achievement_id !== undefined) {
+        updateData.achievement_id = updates.achievement_id || null;
+      }
+    }
+
+    const nextStatus = (updates.status ?? currentActivity.status) as string;
+    const transitionedToDone = nextStatus === 'done' && currentActivity.status !== 'done';
+    const transitionedOutOfDone = nextStatus !== 'done' && currentActivity.status === 'done';
+
+    if (transitionedToDone) {
+      updateData.completed_at = new Date().toISOString();
+    } else if (transitionedOutOfDone) {
+      updateData.completed_at = null;
+    }
+
+    const { data, error } = await supabase
       .from('cdt_activities')
       .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
-    // Coluna cover_image_url inexistente: retorna 503 com instrução em vez de retry sem capa
     if (error && (error.code === 'PGRST204' || /column.*does not exist|cover_image_url/i.test(String(error.message))) && updateData.cover_image_url !== undefined) {
       return res.status(503).json({
-        error: 'Para salvar a capa, adicione a coluna no banco. No Supabase (SQL Editor) execute:',
+        error: 'To save cover image, add the required DB column first.',
         code: 'MIGRATION_REQUIRED',
         sql: 'ALTER TABLE cdt_activities ADD COLUMN IF NOT EXISTS cover_image_url TEXT NULL;',
       });
@@ -206,6 +320,35 @@ router.put('/:id', async (req, res) => {
     if (!data) {
       return res.status(404).json({ error: 'Activity not found' });
     }
+
+    if (transitionedToDone) {
+      const earnerId = data.assigned_to || data.created_by;
+      if (earnerId) {
+        const linkedReward = await getLinkedAchievementReward(data.achievement_id ?? null);
+        const completedAt = data.completed_at ? new Date(data.completed_at) : new Date();
+        const onDeadline =
+          Boolean(data.due_date) && completedAt.getTime() <= new Date(data.due_date as string).getTime();
+
+        const xpAmount = calculateItemCompletionXp({
+          baseXp: parseDecimal(data.xp_reward, 1),
+          onDeadline,
+          deadlineBonusPercent: parseDecimal(data.deadline_bonus_percent, 0),
+          linkedAchievementFixedXp: linkedReward.fixedXp,
+          linkedAchievementPercent: linkedReward.percent,
+        });
+
+        const awarded = await awardActivityCompletionXp({
+          userId: earnerId,
+          activityId: data.id,
+          xpAmount,
+        });
+        await unlockLinkedAchievementIfNeeded(earnerId, data.achievement_id ?? null);
+        if (awarded) {
+          await evaluateAndAwardGlobalAchievements(earnerId);
+        }
+      }
+    }
+
     res.json(data);
   } catch (error: any) {
     console.error('Error updating activity:', error);
@@ -213,12 +356,15 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete activity
+// Delete activity (admin only)
 router.delete('/:id', async (req, res) => {
   try {
+    const requesterId = await ensureAdmin(req, res);
+    if (!requesterId) return;
+
     const { id } = req.params;
     const { error } = await supabase
-      .from('activities')
+      .from('cdt_activities')
       .delete()
       .eq('id', id);
 

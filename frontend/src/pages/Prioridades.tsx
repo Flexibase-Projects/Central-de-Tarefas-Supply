@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Box, Typography, Paper, Chip, CircularProgress } from '@mui/material'
-import { DragIndicator } from '@mui/icons-material'
+import { GripVertical } from '@/components/ui/icons'
 import { useGitHub } from '@/hooks/use-github'
 import {
   DndContext,
@@ -45,7 +45,6 @@ function SortableProjectCard({ project, index }: { project: Project; index: numb
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useSortable({ id: project.id })
   const { getCommitsCount } = useGitHub()
@@ -81,6 +80,8 @@ function SortableProjectCard({ project, index }: { project: Project; index: numb
         py: 1,
         opacity: isDragging ? 0.6 : 1,
         cursor: 'grab',
+        border: '1px solid',
+        borderColor: 'divider',
         '&:active': { cursor: 'grabbing' },
         '&:hover': { bgcolor: 'action.hover' },
         willChange: isDragging ? 'transform' : undefined,
@@ -91,7 +92,7 @@ function SortableProjectCard({ project, index }: { project: Project; index: numb
         {...listeners}
         sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}
       >
-        <DragIndicator sx={{ fontSize: 20 }} />
+        <GripVertical size={20} />
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ minWidth: 24 }}>
         {index + 1}.
@@ -193,7 +194,15 @@ export default function Prioridades() {
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, pb: 2 }}>
         {projects.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 3,
+              textAlign: 'center',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
             <Typography color="text.secondary">
               Nenhum desenvolvimento cadastrado. Crie projetos em Desenvolvimentos para listá-los aqui.
             </Typography>

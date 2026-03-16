@@ -52,6 +52,7 @@ export interface Comment {
   created_by: string | null
   author_name?: string | null
   author_email?: string | null
+  author_level?: number | null
 }
 
 export interface ProjectTodo {
@@ -64,6 +65,11 @@ export interface ProjectTodo {
   created_at: string
   updated_at: string
   created_by: string | null
+  xp_reward?: number        // default 1.00
+  deadline_bonus_percent?: number // default 0.00
+  deadline?: string | null  // ISO date
+  achievement_id?: string | null
+  completed_at?: string | null
 }
 
 export interface GitHubCommit {
@@ -117,6 +123,10 @@ export interface Activity {
   created_at: string
   updated_at: string
   created_by: string | null
+  xp_reward?: number        // default 1.00
+  deadline_bonus_percent?: number // default 0.00
+  achievement_id?: string | null
+  completed_at?: string | null
 }
 
 export interface User {
@@ -223,4 +233,66 @@ export interface IndicatorsData {
   by_project: ProjectIndicator[]
   by_activity: ActivityIndicator[]
   team: TeamTotals
+}
+
+export interface UserProgressAchievement {
+  id: string
+  slug?: string
+  name: string
+  description: string
+  icon: string
+  rarity?: 'common' | 'rare' | 'epic' | 'legendary'
+  xpBonus?: number
+  unlocked: boolean
+  unlockedAt?: string | null
+}
+
+export interface UserProgress {
+  completedTodos: number
+  completedActivities: number
+  totalXp: number
+  level: number
+  xpInCurrentLevel: number
+  xpForNextLevel: number
+  streakDays?: number
+  tier?: {
+    name: string
+    color: string
+    glowColor: string
+    cssClass: string
+  }
+  achievements: UserProgressAchievement[]
+}
+
+export interface Achievement {
+  id: string
+  slug: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  xpBonus: number
+  rewardXpFixed?: number
+  rewardPercent?: number
+  conditionType?: string | null
+  conditionValue?: number | null
+  mode?: 'global_auto' | 'linked_item' | 'manual' | string
+  isPreset?: boolean
+  isActive?: boolean
+  unlocked?: boolean
+  unlockedAt?: string | null
+  createdAt?: string
+}
+
+export type TierName = 'Cobalt' | 'Uranium' | 'Platinum' | 'FlexiBase'
+
+export interface TierInfo {
+  name: TierName
+  min: number
+  max: number
+  color: string
+  glowColor: string
+  cssClass: string
+  gradient?: string
 }
