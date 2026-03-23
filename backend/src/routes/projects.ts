@@ -5,6 +5,49 @@ import { getRecentCommits, parseGitHubUrl } from '../services/github.js';
 
 const router = express.Router();
 
+function getRequesterId(req: express.Request): string | null {
+  return (
+    ((req as express.Request & { userId?: string }).userId ?? null) ||
+    (req.headers['x-user-id'] as string | undefined) ||
+    null
+  );
+}
+
+type ProjectTodoSummaryRow = {
+  project_id: string | null;
+  assigned_to: string | null;
+  completed: boolean | null;
+  xp_reward: number | null;
+};
+
+function parseNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+async function fetchOrderedProjects() {
+  const baseQuery = supabase.from('cdt_projects').select('id, name, status, priority_order, created_at');
+  const orderedQuery = await baseQuery
+    .order('priority_order', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (orderedQuery.error && /priority_order|does not exist|column.*not exist/i.test(String(orderedQuery.error.message || ''))) {
+    const fallback = await supabase
+      .from('cdt_projects')
+      .select('id, name, status, created_at')
+      .order('created_at', { ascending: false });
+    if (fallback.error) throw fallback.error;
+    return (fallback.data ?? []) as Array<{ id: string; name: string; status: string; created_at: string }>;
+  }
+
+  if (orderedQuery.error) throw orderedQuery.error;
+  return (orderedQuery.data ?? []) as Array<{ id: string; name: string; status: string; created_at: string }>;
+}
+
 // Get all projects (ordem: priority_order quando a coluna existir, senão created_at)
 router.get('/', async (req, res) => {
   try {
@@ -15,20 +58,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    let query = supabase.from('cdt_projects').select('*');
-    let { data, error } = await query
-      .order('priority_order', { ascending: true, nullsFirst: false })
-      .order('created_at', { ascending: false });
-
-    if (error && /priority_order|does not exist|column.*not exist/i.test(String(error.message || ''))) {
-      const fallback = await supabase
-        .from('cdt_projects')
-        .select('*')
-        .order('created_at', { ascending: false });
-      data = fallback.data;
-      error = fallback.error;
-    }
-    if (error) throw error;
+    const data = await fetchOrderedProjects();
     res.json(data || []);
   } catch (error: any) {
     console.error('Error fetching projects:', error);
@@ -159,6 +189,56 @@ router.get('/version-check', async (req, res) => {
   } catch (err: any) {
     console.error('Error in version-check:', err);
     res.json({ upToDate: null, latestSha: null, deployedSha: null, reason: 'fetch_error', error: err.message });
+  }
+});
+
+router.get('/todo-card-summary', async (req, res) => {
+  try {
+    const requesterId = getRequesterId(req);
+    if (!requesterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const [projects, todosRes] = await Promise.all([
+      fetchOrderedProjects(),
+      supabase
+        .from('cdt_project_todos')
+        .select('project_id, assigned_to, completed, xp_reward')
+        .not('project_id', 'is', null),
+    ]);
+
+    if (todosRes.error) throw todosRes.error;
+
+    const todos = (todosRes.data ?? []) as ProjectTodoSummaryRow[];
+    const todoCountByProject = new Map<string, { myAssignedOpenCount: number; xpPendingCount: number }>();
+
+    for (const todo of todos) {
+      if (!todo.project_id) continue;
+      const current = todoCountByProject.get(todo.project_id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      if (todo.assigned_to === requesterId && todo.completed !== true) {
+        current.myAssignedOpenCount += 1;
+      }
+      if (parseNumber(todo.xp_reward, 0) <= 0) {
+        current.xpPendingCount += 1;
+      }
+      todoCountByProject.set(todo.project_id, current);
+    }
+
+    const summary = projects.map((project: { id: string; name: string; status: string }) => {
+      const counts = todoCountByProject.get(project.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      return {
+        project_id: project.id,
+        project_name: project.name,
+        project_status: project.status,
+        myAssignedOpenCount: counts.myAssignedOpenCount,
+        xpPendingCount: counts.xpPendingCount,
+      };
+    });
+
+    return res.json(summary);
+  } catch (error: any) {
+    console.error('Error fetching todo card summary:', error);
+    return res.status(500).json({ error: error.message || 'Failed to fetch todo card summary' });
   }
 });
 
