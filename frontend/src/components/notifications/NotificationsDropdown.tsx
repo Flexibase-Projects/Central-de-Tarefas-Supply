@@ -17,21 +17,54 @@ import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import { Notification } from '@/types'
 
+function getNotificationRoute(notification: Notification): string | null {
+  const message = notification.message?.toLowerCase() ?? ''
+  const looksLikeActivity =
+    notification.type.startsWith('activity_') ||
+    notification.type.includes('activity') ||
+    message.includes(' atividade "') ||
+    message.includes(' na atividade ')
+
+  if (notification.project_id) {
+    const params = new URLSearchParams(
+      looksLikeActivity
+        ? { activity: notification.project_id }
+        : { project: notification.project_id },
+    )
+    if (notification.related_id && notification.related_type === 'todo') {
+      params.set('todo', notification.related_id)
+    }
+    return looksLikeActivity
+      ? `/atividades?${params.toString()}`
+      : `/desenvolvimentos?${params.toString()}`
+  }
+
+  if (notification.related_type === 'activity' && notification.related_id) {
+    return `/atividades?activity=${notification.related_id}`
+  }
+
+  if (notification.related_type === 'todo' && notification.related_id) {
+    return `/atividades?todo=${notification.related_id}`
+  }
+
+  return null
+}
+
 export function NotificationsDropdown() {
   const { notifications, unreadCount, loading, markAsRead, markAllAsRead } = useNotifications()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const open = Boolean(anchorEl)
   const navigate = useNavigate()
 
-  const unreadNotifications = notifications.filter((n) => !n.read)
+  const unreadNotifications = notifications.filter((notification) => !notification.read)
 
   const unreadByProject = useMemo(() => {
     const map = new Map<string, { name: string; count: number }>()
     unreadNotifications.forEach((notification) => {
       if (notification.project_id) {
         const name = notification.message?.match(/projeto "([^"]+)"/)?.[1] || 'Projeto'
-        const cur = map.get(notification.project_id)
-        if (cur) cur.count++
+        const current = map.get(notification.project_id)
+        if (current) current.count++
         else map.set(notification.project_id, { name, count: 1 })
       }
     })
@@ -61,15 +94,14 @@ export function NotificationsDropdown() {
   }
 
   const handleNotificationClick = (notification: Notification) => {
-    if (notification.project_id) {
-      if (!notification.read) markAsRead(notification.id)
-      handleClose()
-      const params = new URLSearchParams({ project: notification.project_id })
-      if (notification.related_id && notification.related_type === 'todo') {
-        params.set('todo', notification.related_id)
-      }
-      navigate(`/desenvolvimentos?${params.toString()}`)
+    const route = getNotificationRoute(notification)
+    if (!route) return
+
+    if (!notification.read) {
+      void markAsRead(notification.id)
     }
+    handleClose()
+    navigate(route)
   }
 
   return (
@@ -79,7 +111,7 @@ export function NotificationsDropdown() {
           unreadCount > 0 ? (
             <Box>
               <Typography variant="body2" fontWeight={600}>
-                {unreadCount} {unreadCount === 1 ? 'notificação não lida' : 'notificações não lidas'}
+                {unreadCount} {unreadCount === 1 ? 'notificacao nao lida' : 'notificacoes nao lidas'}
               </Typography>
               {unreadByProject.length > 0 && (
                 <Box sx={{ mt: 0.5 }}>
@@ -92,13 +124,13 @@ export function NotificationsDropdown() {
               )}
             </Box>
           ) : (
-            'Notificações'
+            'Notificacoes'
           )
         }
       >
         <IconButton
           onClick={handleOpen}
-          aria-label="Notificações"
+          aria-label="Notificacoes"
           aria-controls={open ? 'notifications-menu' : undefined}
           aria-haspopup="true"
           aria-expanded={open ? 'true' : undefined}
@@ -116,11 +148,7 @@ export function NotificationsDropdown() {
             }),
           }}
         >
-          <Badge
-            badgeContent={unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : 0}
-            color="error"
-            max={99}
-          >
+          <Badge badgeContent={unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : 0} color="error" max={99}>
             <Bell size={18} />
           </Badge>
         </IconButton>
@@ -147,7 +175,6 @@ export function NotificationsDropdown() {
         }}
         MenuListProps={{ disablePadding: true }}
       >
-        {/* Cabeçalho */}
         <Box
           sx={{
             px: 2,
@@ -159,7 +186,7 @@ export function NotificationsDropdown() {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
             <Typography variant="subtitle1" fontWeight={700} color="text.primary">
-              Notificações
+              Notificacoes
             </Typography>
             {unreadNotifications.length > 0 && (
               <Button
@@ -175,7 +202,6 @@ export function NotificationsDropdown() {
           </Box>
         </Box>
 
-        {/* Lista */}
         <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
@@ -185,7 +211,7 @@ export function NotificationsDropdown() {
             <Box sx={{ py: 6, px: 3, textAlign: 'center' }}>
               <Bell size={48} style={{ marginBottom: 8 }} />
               <Typography variant="body2" color="text.secondary">
-                Nenhuma notificação
+                Nenhuma notificacao
               </Typography>
             </Box>
           ) : (
@@ -210,21 +236,20 @@ export function NotificationsDropdown() {
                   </Box>
                 )
               })}
+
               {groupedNotifications.withoutProject.length > 0 && (
                 <Box>
-                  {groupedNotifications.withoutProject.length > 0 && (
-                    <Box sx={{ px: 2, py: 0.75 }}>
-                      <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Geral
-                      </Typography>
-                    </Box>
-                  )}
+                  <Box sx={{ px: 2, py: 0.75 }}>
+                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Geral e atividades
+                    </Typography>
+                  </Box>
                   {groupedNotifications.withoutProject.map((notification) => (
                     <NotificationItem
                       key={notification.id}
                       notification={notification}
                       onMarkRead={() => markAsRead(notification.id)}
-                      onClick={() => {}}
+                      onClick={() => handleNotificationClick(notification)}
                     />
                   ))}
                 </Box>
@@ -247,6 +272,7 @@ function NotificationItem({
   onClick: () => void
 }) {
   const isUnread = !notification.read
+  const hasRoute = Boolean(getNotificationRoute(notification))
 
   return (
     <Paper
@@ -259,7 +285,7 @@ function NotificationItem({
         border: '1px solid',
         borderColor: isUnread ? 'primary.light' : 'divider',
         bgcolor: isUnread ? 'action.selected' : 'transparent',
-        cursor: notification.project_id ? 'pointer' : 'default',
+        cursor: hasRoute ? 'pointer' : 'default',
         transition: 'background-color 0.15s, border-color 0.15s',
         '&:hover': {
           bgcolor: 'action.hover',
@@ -269,11 +295,7 @@ function NotificationItem({
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, p: 1.5 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            fontWeight={isUnread ? 600 : 500}
-            sx={{ lineHeight: 1.35 }}
-          >
+          <Typography variant="body2" fontWeight={isUnread ? 600 : 500} sx={{ lineHeight: 1.35 }}>
             {notification.title}
           </Typography>
           {notification.message && (
@@ -298,8 +320,8 @@ function NotificationItem({
         {isUnread && (
           <IconButton
             size="small"
-            onClick={(e) => {
-              e.stopPropagation()
+            onClick={(event) => {
+              event.stopPropagation()
               onMarkRead()
             }}
             sx={{ flexShrink: 0, color: 'primary.main' }}

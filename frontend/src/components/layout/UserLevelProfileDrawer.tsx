@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import {
   Box,
   Drawer,
@@ -19,7 +19,6 @@ import { useIndicators } from '@/hooks/use-indicators'
 import { getTierForLevel } from '@/utils/tier'
 import { TierBadge } from '@/components/gamification/TierBadge'
 import { Person, BarChart2, ExternalLink, MessageCircleIcon, List, CheckCircle, ClipboardList } from '@/components/ui/icons'
-import type { UserIndicator } from '@/types'
 
 function StatTile({
   icon: Icon,
@@ -107,11 +106,7 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
   const xpPercent = progress
     ? Math.min(100, ((progress.xpInCurrentLevel ?? 0) / Math.max(1, progress.xpForNextLevel ?? 1)) * 100)
     : 0
-
-  const myRow = useMemo<UserIndicator | null>(() => {
-    if (!currentUser?.id || !indicators?.by_user) return null
-    return indicators.by_user.find((u) => u.user_id === currentUser.id) ?? null
-  }, [currentUser?.id, indicators?.by_user])
+  const personal = indicators?.personal ?? null
 
   const panelBg = isLight ? theme.palette.background.paper : '#1e1f22'
   const bannerGradient = isLight
@@ -150,7 +145,6 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
         },
       }}
     >
-      {/* Steam-style banner + Discord-style dense header */}
       <Box
         sx={{
           position: 'relative',
@@ -214,7 +208,6 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
             </Box>
           </Box>
 
-          {/* Steam-style level badge */}
           <Box
             sx={{
               width: 56,
@@ -325,14 +318,14 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
           <Typography variant="caption" color="error">
             {indicatorsError}
           </Typography>
-        ) : myRow ? (
+        ) : personal ? (
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-            <StatTile icon={MessageCircleIcon} label="Comentários" value={myRow.comments_count} iconColor="#5865F2" />
-            <StatTile icon={List} label="TO-DOs criados" value={myRow.todos_created} iconColor="#3BA55D" />
-            <StatTile icon={CheckCircle} label="TO-DOs concluídos" value={myRow.todos_completed} iconColor="#57F287" />
-            <StatTile icon={ClipboardList} label="Ativ. criadas" value={myRow.activities_created} iconColor="#F59E0B" />
+            <StatTile icon={MessageCircleIcon} label="Comentários" value={personal.commentsCount} iconColor="#5865F2" />
+            <StatTile icon={List} label="TO-DOs atribuídos" value={personal.todosAssignedTotal} iconColor="#3BA55D" />
+            <StatTile icon={CheckCircle} label="TO-DOs concluídos" value={personal.todosAssignedCompleted} iconColor="#57F287" />
+            <StatTile icon={ClipboardList} label="TO-DOs pendentes" value={personal.todosAssignedOpen} iconColor="#F59E0B" />
             <Box sx={{ gridColumn: '1 / -1' }}>
-              <StatTile icon={BarChart2} label="Atividades atribuídas" value={myRow.activities_assigned} iconColor="#00BFFF" />
+              <StatTile icon={BarChart2} label="Atividades atribuídas" value={personal.activitiesAssigned} iconColor="#00BFFF" />
             </Box>
           </Box>
         ) : !indicatorsLoading ? (

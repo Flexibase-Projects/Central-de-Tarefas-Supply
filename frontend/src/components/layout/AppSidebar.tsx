@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import React, { useMemo, useState } from 'react'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   Dashboard,
   MapIcon,
@@ -18,19 +18,32 @@ import {
   TrendingUp,
   OrgChartIcon,
   DollarSign,
-} from '@/components/ui/icons';
-import { Avatar, Badge, Box, Divider, IconButton, Menu as MuiMenu, MenuItem, Tooltip, Typography, useTheme } from '@mui/material';
-import { UserLevelProfileDrawer } from '@/components/layout/UserLevelProfileDrawer';
-import { Sun, Moon } from 'lucide-react';
-import { useThemeMode } from '@/theme/ThemeProvider';
-import { usePermissions } from '@/hooks/use-permissions';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUserProgress } from '@/hooks/use-user-progress';
-import { LevelXpBar } from '@/components/master-mode/LevelXpBar';
-import { getTierForLevel } from '@/utils/tier';
-import { useMyPendingTodosCount } from '@/hooks/use-my-pending-todos';
+} from '@/components/ui/icons'
+import {
+  Avatar,
+  Badge,
+  Box,
+  Chip,
+  Divider,
+  IconButton,
+  Menu as MuiMenu,
+  MenuItem,
+  Paper,
+  Tooltip,
+  Typography,
+  useTheme,
+} from '@mui/material'
+import { UserLevelProfileDrawer } from '@/components/layout/UserLevelProfileDrawer'
+import { Sun, Moon } from 'lucide-react'
+import { useThemeMode } from '@/theme/ThemeProvider'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useAuth } from '@/contexts/AuthContext'
+import { useUserProgress } from '@/hooks/use-user-progress'
+import { LevelXpBar } from '@/components/master-mode/LevelXpBar'
+import { getTierForLevel } from '@/utils/tier'
+import { useMyPendingTodosCount } from '@/hooks/use-my-pending-todos'
 
-type NavItem = { title: string; url: string; icon: React.ElementType; permission: string | null; requireRole?: string };
+type NavItem = { title: string; url: string; icon: React.ElementType; permission: string | null; requireRole?: string }
 
 const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
@@ -56,66 +69,147 @@ const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: 'GESTÃO',
     items: [{ title: 'Configurações', url: '/configuracoes', icon: Settings, permission: null, requireRole: 'admin' }],
   },
-];
+]
 
-// Submenu do card de nível (abre à direita ao clicar no card)
 const LEVEL_CARD_MENU_ITEMS: { title: string; url: string; icon: React.ElementType; iconStyle?: React.CSSProperties }[] = [
   { title: 'Ver Meu Nível', url: '/perfil', icon: Person },
   { title: 'Conquistas', url: '/conquistas', icon: Trophy, iconStyle: { color: '#F59E0B' } },
   { title: 'Progressão', url: '/niveis', icon: TrendingUp },
   { title: 'Como Funciona?', url: '/tutorial', icon: HelpCircle },
-];
+]
 
 interface AppSidebarProps {
-  isCollapsed?: boolean;
-  onCollapsedChange?: (collapsed: boolean) => void;
+  isCollapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
+}
+
+function DemandCard({ count, compact = false }: { count: number | null; compact?: boolean }) {
+  const resolvedCount = count ?? 0
+  const hasPending = resolvedCount > 0
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 2,
+        overflow: 'hidden',
+        border: '1px solid',
+        borderColor: hasPending ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.18)',
+        background: hasPending
+          ? 'linear-gradient(135deg, rgba(245,158,11,0.16) 0%, rgba(217,119,6,0.08) 100%)'
+          : 'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, rgba(14,165,233,0.06) 100%)',
+        boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <Box
+        component={Link}
+        to="/indicadores"
+        style={{ textDecoration: 'none', display: 'block' }}
+      >
+        <Box sx={{ p: compact ? 1.25 : 1.5, color: 'text.primary' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: hasPending ? 'warning.dark' : 'primary.main' }}>
+              Minhas demandas
+            </Typography>
+            <Chip
+              size="small"
+              label={hasPending ? `${resolvedCount} em aberto` : 'Tudo em dia'}
+              sx={{
+                height: 22,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: hasPending ? 'rgba(245,158,11,0.18)' : 'rgba(37,99,235,0.12)',
+                color: hasPending ? '#92400E' : '#1D4ED8',
+                border: '1px solid',
+                borderColor: hasPending ? 'rgba(245,158,11,0.35)' : 'rgba(37,99,235,0.18)',
+              }}
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 0.75 }}>
+            <Typography variant={compact ? 'h6' : 'h4'} sx={{ fontWeight: 900, lineHeight: 0.95, letterSpacing: -0.03 }}>
+              {resolvedCount.toString().padStart(2, '0')}
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', pb: 0.4 }}>
+              {hasPending ? 'entregas esperando você' : 'entregas concluídas'}
+            </Typography>
+          </Box>
+
+          {!compact && (
+            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary', lineHeight: 1.4 }}>
+              {hasPending
+                ? 'Abra os cards, feche a fila e avance com consistência.'
+                : 'Tudo em dia. Agora é só manter o ritmo e proteger esse avanço.'}
+            </Typography>
+          )}
+
+          <Box sx={{ mt: 1.25, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              sx={{
+                px: 1,
+                py: 0.4,
+                borderRadius: 999,
+                bgcolor: hasPending ? 'rgba(245,158,11,0.18)' : 'rgba(37,99,235,0.12)',
+                color: hasPending ? 'warning.dark' : 'primary.dark',
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {hasPending ? 'Abrir indicadores' : 'Seu ritmo está em dia'}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </Paper>
+  )
 }
 
 export function AppSidebar(props: AppSidebarProps = {}) {
-  const { isCollapsed: controlledCollapsed, onCollapsedChange } = props;
-  const location = useLocation();
-  const navigate = useNavigate();
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-  const { mode, toggleTheme } = useThemeMode();
-  const { hasPermission, hasRole } = usePermissions();
-  const { logout, currentUser } = useAuth();
-  const { data: progressData, loading: progressLoading } = useUserProgress();
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const [levelMenuAnchor, setLevelMenuAnchor] = useState<HTMLElement | null>(null);
-  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
-  const { count: pendingTodosCount } = useMyPendingTodosCount();
-  const isCollapsed = controlledCollapsed ?? internalCollapsed;
+  const { isCollapsed: controlledCollapsed, onCollapsedChange } = props
+  const location = useLocation()
+  const navigate = useNavigate()
+  const theme = useTheme()
+  const isLight = theme.palette.mode === 'light'
+  const { mode, toggleTheme } = useThemeMode()
+  const { hasPermission, hasRole } = usePermissions()
+  const { logout, currentUser } = useAuth()
+  const { data: progressData, loading: progressLoading } = useUserProgress()
+  const [internalCollapsed, setInternalCollapsed] = useState(false)
+  const [levelMenuAnchor, setLevelMenuAnchor] = useState<HTMLElement | null>(null)
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
+  const { count: pendingTodosCount } = useMyPendingTodosCount()
+  const isCollapsed = controlledCollapsed ?? internalCollapsed
+
   const setIsCollapsed = (v: boolean) => {
-    onCollapsedChange?.(v);
-    if (!onCollapsedChange) setInternalCollapsed(v);
-  };
+    onCollapsedChange?.(v)
+    if (!onCollapsedChange) setInternalCollapsed(v)
+  }
 
   const visibleSections = useMemo(() => {
     return SIDEBAR_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (item.requireRole) return hasRole(item.requireRole);
-        if (item.permission) return hasPermission(item.permission);
-        return true;
+        if (item.requireRole) return hasRole(item.requireRole)
+        if (item.permission) return hasPermission(item.permission)
+        return true
       }),
-    })).filter((s) => s.items.length > 0);
-  }, [hasPermission, hasRole]);
+    })).filter((s) => s.items.length > 0)
+  }, [hasPermission, hasRole])
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
-  };
+    await logout()
+    navigate('/login', { replace: true })
+  }
 
-  const sidebarBg = isLight ? '#ffffff' : theme.palette.background.default;
-  const borderColor = theme.palette.divider;
-  const activeColor = theme.palette.primary.main;
-  const hoverBg = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)';
+  const sidebarBg = isLight ? '#ffffff' : theme.palette.background.default
+  const borderColor = theme.palette.divider
+  const activeColor = theme.palette.primary.main
+  const hoverBg = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.07)'
 
   const isActiveLink = (url: string) =>
     url === '/configuracoes'
       ? location.pathname === '/configuracoes' || location.pathname.startsWith('/configuracoes/')
-      : location.pathname === url;
+      : location.pathname === url
 
   return (
     <Box
@@ -134,27 +228,31 @@ export function AppSidebar(props: AppSidebarProps = {}) {
         color: 'text.primary',
       }}
     >
-      {/* Header */}
       {isCollapsed ? (
         <Box sx={{ borderBottom: `1px solid ${borderColor}`, flexShrink: 0 }}>
           <Box sx={{ minHeight: 56, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Tooltip title={pendingTodosCount ? `${pendingTodosCount} TO-DO${pendingTodosCount > 1 ? 's' : ''} pendente${pendingTodosCount > 1 ? 's' : ''}` : 'CDT'} placement="right">
+            <Tooltip
+              title={
+                pendingTodosCount
+                  ? `${pendingTodosCount} TO-DO${pendingTodosCount > 1 ? 's' : ''} pendente${pendingTodosCount > 1 ? 's' : ''}`
+                  : 'CDT'
+              }
+              placement="right"
+            >
               <Badge
                 badgeContent={pendingTodosCount ?? 0}
                 color="warning"
                 max={99}
                 sx={{ '& .MuiBadge-badge': { fontSize: 9, minWidth: 16, height: 16 } }}
               >
-                <Typography variant="caption" fontWeight={700} sx={{ fontSize: 11, letterSpacing: 0.2 }}>CDT</Typography>
+                <Typography variant="caption" fontWeight={700} sx={{ fontSize: 11, letterSpacing: 0.2 }}>
+                  CDT
+                </Typography>
               </Badge>
             </Tooltip>
           </Box>
           <Tooltip title="Expandir" placement="right">
-            <IconButton
-              onClick={() => setIsCollapsed(false)}
-              sx={{ width: '100%', borderRadius: 0, py: 1.25 }}
-              size="small"
-            >
+            <IconButton onClick={() => setIsCollapsed(false)} sx={{ width: '100%', borderRadius: 0, py: 1.25 }} size="small">
               <Menu size={18} />
             </IconButton>
           </Tooltip>
@@ -175,28 +273,6 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           <Typography sx={{ fontSize: 14, fontWeight: 600, letterSpacing: 0.4, color: 'text.primary', lineHeight: 1.25 }}>
             Central de Tarefas
           </Typography>
-          {pendingTodosCount != null && pendingTodosCount > 0 && (
-            <Tooltip title={`${pendingTodosCount} TO-DO${pendingTodosCount > 1 ? 's' : ''} pendente${pendingTodosCount > 1 ? 's' : ''} para você`} arrow>
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                  px: 0.9,
-                  py: 0.2,
-                  borderRadius: 10,
-                  bgcolor: 'warning.main',
-                  color: 'warning.contrastText',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  flexShrink: 0,
-                }}
-              >
-                ✓ {pendingTodosCount}
-              </Box>
-            </Tooltip>
-          )}
           <Tooltip title="Recolher">
             <IconButton onClick={() => setIsCollapsed(true)} size="small" sx={{ ml: 'auto', mr: -0.5 }}>
               <ChevronLeft size={16} />
@@ -205,7 +281,12 @@ export function AppSidebar(props: AppSidebarProps = {}) {
         </Box>
       )}
 
-      {/* Navigation */}
+      {!isCollapsed && (
+        <Box sx={{ px: 1.5, pt: 1.5, pb: 0.5 }}>
+          <DemandCard count={pendingTodosCount} />
+        </Box>
+      )}
+
       <Box
         sx={{
           flex: 1,
@@ -216,9 +297,7 @@ export function AppSidebar(props: AppSidebarProps = {}) {
       >
         {visibleSections.map((section, sectionIndex) => (
           <Box key={section.title}>
-            {sectionIndex > 0 && (
-              <Divider sx={{ borderColor: borderColor, my: 2 }} />
-            )}
+            {sectionIndex > 0 && <Divider sx={{ borderColor: borderColor, my: 2 }} />}
             {!isCollapsed && (
               <Box
                 component="p"
@@ -239,8 +318,8 @@ export function AppSidebar(props: AppSidebarProps = {}) {
             )}
             <Box component="nav" sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mb: sectionIndex < visibleSections.length - 1 ? 2.5 : 0 }}>
               {section.items.map((item) => {
-                const Icon = item.icon;
-                const active = isActiveLink(item.url);
+                const Icon = item.icon
+                const active = isActiveLink(item.url)
                 const link = (
                   <Box sx={{ position: 'relative' }}>
                     {active && (
@@ -269,17 +348,15 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                         padding: isCollapsed ? '10px 0' : '10px 12px',
                         justifyContent: isCollapsed ? 'center' : 'flex-start',
                         gap: 12,
-                        backgroundColor: active
-                          ? isLight ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.12)'
-                          : 'transparent',
+                        backgroundColor: active ? (isLight ? 'rgba(37,99,235,0.08)' : 'rgba(96,165,250,0.12)') : 'transparent',
                         color: active ? activeColor : 'inherit',
                         transition: 'background-color 0.15s, color 0.15s',
                       }}
                       onMouseOver={(e) => {
-                        if (!active) e.currentTarget.style.backgroundColor = hoverBg;
+                        if (!active) e.currentTarget.style.backgroundColor = hoverBg
                       }}
                       onMouseOut={(e) => {
-                        if (!active) e.currentTarget.style.backgroundColor = 'transparent';
+                        if (!active) e.currentTarget.style.backgroundColor = 'transparent'
                       }}
                     >
                       <Icon size={16} style={{ flexShrink: 0 }} />
@@ -299,21 +376,20 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                       )}
                     </Link>
                   </Box>
-                );
+                )
                 return isCollapsed ? (
                   <Tooltip key={item.url} title={item.title} placement="right">
                     <Box>{link}</Box>
                   </Tooltip>
                 ) : (
                   <Box key={item.url}>{link}</Box>
-                );
+                )
               })}
             </Box>
           </Box>
         ))}
       </Box>
 
-      {/* Footer */}
       <Box
         sx={{
           borderTop: `1px solid ${borderColor}`,
@@ -324,7 +400,6 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           flexShrink: 0,
         }}
       >
-        {/* Seletor de tema — acima do nível */}
         <Tooltip title={isCollapsed ? (mode === 'light' ? 'Modo escuro' : 'Modo claro') : undefined} placement="right">
           <Box
             component="button"
@@ -364,7 +439,6 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           </Box>
         </Tooltip>
 
-        {/* Card de nível — ao clicar abre submenu à direita com: Ver Meu Nível, Conquistas, Progressão, Como Funciona? */}
         <Tooltip title={isCollapsed ? 'Nível e mais opções' : undefined} placement="right">
           <Box
             component="button"
@@ -413,17 +487,18 @@ export function AppSidebar(props: AppSidebarProps = {}) {
             {!isCollapsed && (
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <LevelXpBar progress={progressData} loading={progressLoading} compact />
-                {progressData?.level != null && (() => {
-                  const t = getTierForLevel(progressData.level);
-                  return (
-                    <Typography
-                      variant="caption"
-                      sx={{ fontSize: 10, fontWeight: 600, color: t.color, lineHeight: 1, display: 'block', mt: 0.25 }}
-                    >
-                      {t.name}
-                    </Typography>
-                  );
-                })()}
+                {progressData?.level != null &&
+                  (() => {
+                    const t = getTierForLevel(progressData.level)
+                    return (
+                      <Typography
+                        variant="caption"
+                        sx={{ fontSize: 10, fontWeight: 600, color: t.color, lineHeight: 1, display: 'block', mt: 0.25 }}
+                      >
+                        {t.name}
+                      </Typography>
+                    )
+                  })()}
               </Box>
             )}
           </Box>
@@ -448,14 +523,14 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           }}
         >
           {LEVEL_CARD_MENU_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active = location.pathname === item.url;
+            const Icon = item.icon
+            const active = location.pathname === item.url
             return (
               <MenuItem
                 key={item.url}
                 onClick={() => {
-                  setLevelMenuAnchor(null);
-                  navigate(item.url);
+                  setLevelMenuAnchor(null)
+                  navigate(item.url)
                 }}
                 sx={{
                   gap: 1.5,
@@ -470,13 +545,12 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                 </span>
                 {item.title}
               </MenuItem>
-            );
+            )
           })}
         </MuiMenu>
 
         <Divider sx={{ borderColor: borderColor, my: 0.5 }} />
 
-        {/* User row: abre painel nível + indicadores; logout */}
         {!isCollapsed && currentUser ? (
           <Box
             sx={{
@@ -520,10 +594,7 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                 }}
               >
                 <Person size={14} style={{ flexShrink: 0 }} />
-                <Box
-                  component="span"
-                  sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                >
+                <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {currentUser.name}
                 </Box>
               </Box>
@@ -556,10 +627,7 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                   '&:hover': { bgcolor: hoverBg },
                 }}
               >
-                <Avatar
-                  src={currentUser.avatar_url ?? undefined}
-                  sx={{ width: 32, height: 32, fontSize: 13, fontWeight: 700 }}
-                >
+                <Avatar src={currentUser.avatar_url ?? undefined} sx={{ width: 32, height: 32, fontSize: 13, fontWeight: 700 }}>
                   {currentUser.name?.[0]?.toUpperCase() ?? '?'}
                 </Avatar>
               </IconButton>
@@ -606,5 +674,5 @@ export function AppSidebar(props: AppSidebarProps = {}) {
 
       <UserLevelProfileDrawer open={profileDrawerOpen} onClose={() => setProfileDrawerOpen(false)} />
     </Box>
-  );
+  )
 }

@@ -24,13 +24,36 @@ function invalidateTodosForActivity(activityId: string) {
 
 export type TodosScope = { projectId: string; activityId?: never } | { activityId: string; projectId?: never }
 
+type TodoEntity = ProjectTodo & {
+  assigned_at?: string | null
+}
+
+type TodoMutationResponse = {
+  todo: TodoEntity
+  xpDelta?: number | null
+  xpAction?: string | null
+}
+
+function unwrapTodoMutation(payload: unknown): TodoMutationResponse {
+  if (payload && typeof payload === 'object' && 'todo' in payload) {
+    const mutation = payload as TodoMutationResponse
+    return mutation
+  }
+
+  return {
+    todo: payload as TodoEntity,
+    xpDelta: null,
+    xpAction: null,
+  }
+}
+
 export function useTodos(scope: TodosScope | null) {
   const { getAuthHeaders } = useAuth()
   const projectId = scope && 'projectId' in scope ? scope.projectId : null
   const activityId = scope && 'activityId' in scope ? scope.activityId : null
   const hasScope = Boolean(projectId || activityId)
 
-  const [todos, setTodos] = useState<ProjectTodo[]>([])
+  const [todos, setTodos] = useState<TodoEntity[]>([])
   const [loading, setLoading] = useState(() => hasScope)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -128,11 +151,11 @@ export function useTodos(scope: TodosScope | null) {
           },
           (payload) => {
             if (payload.eventType === 'INSERT' && payload.new) {
-              const row = payload.new as unknown as ProjectTodo
+              const row = payload.new as unknown as TodoEntity
               setTodos((prev) => (prev.some((t) => t.id === row.id) ? prev : [...prev, row]))
             }
             if (payload.eventType === 'UPDATE' && payload.new) {
-              const row = payload.new as unknown as ProjectTodo
+              const row = payload.new as unknown as TodoEntity
               setTodos((prev) => prev.map((t) => (t.id === row.id ? row : t)))
             }
             if (payload.eventType === 'DELETE' && payload.old) {
@@ -167,11 +190,11 @@ export function useTodos(scope: TodosScope | null) {
           },
           (payload) => {
             if (payload.eventType === 'INSERT' && payload.new) {
-              const row = payload.new as unknown as ProjectTodo
+              const row = payload.new as unknown as TodoEntity
               setTodos((prev) => (prev.some((t) => t.id === row.id) ? prev : [...prev, row]))
             }
             if (payload.eventType === 'UPDATE' && payload.new) {
-              const row = payload.new as unknown as ProjectTodo
+              const row = payload.new as unknown as TodoEntity
               setTodos((prev) => prev.map((t) => (t.id === row.id ? row : t)))
             }
             if (payload.eventType === 'DELETE' && payload.old) {
@@ -208,7 +231,8 @@ export function useTodos(scope: TodosScope | null) {
         if (!response.ok) {
           throw new Error('Failed to create todo')
         }
-        const newTodo = await response.json()
+        const payload = await response.json()
+        const newTodo = unwrapTodoMutation(payload).todo
         setTodos((prev) => [...prev, newTodo])
         if (newTodo.project_id) invalidateTodosForProject(newTodo.project_id)
         if (newTodo.activity_id) invalidateTodosForActivity(newTodo.activity_id)
@@ -234,11 +258,11 @@ export function useTodos(scope: TodosScope | null) {
         if (!response.ok) {
           throw new Error('Failed to update todo')
         }
-        const updatedTodo = await response.json()
-        setTodos((prev) => prev.map((todo) => (todo.id === id ? updatedTodo : todo)))
+        const payload = unwrapTodoMutation(await response.json())
+        setTodos((prev) => prev.map((todo) => (todo.id === id ? payload.todo : todo)))
         if (projectId) invalidateTodosForProject(projectId)
         if (activityId) invalidateTodosForActivity(activityId)
-        return updatedTodo
+        return payload
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error'
         setError(errorMessage)

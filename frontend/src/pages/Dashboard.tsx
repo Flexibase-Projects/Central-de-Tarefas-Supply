@@ -49,10 +49,7 @@ export default function Dashboard() {
   const { count: pendingCount } = useMyPendingTodosCount()
 
   // Dados do próprio usuário na lista by_user
-  const myIndicators = useMemo(
-    () => data?.by_user?.find((u) => u.user_id === currentUser?.id) ?? null,
-    [data?.by_user, currentUser?.id],
-  )
+  const personal = data?.personal ?? null
 
   // Mapa id -> nome (usado para exibir responsáveis)
   const userNameById = useMemo(() => {
@@ -70,9 +67,10 @@ export default function Dashboard() {
   const team = data?.team
 
   // Totais para os cards: admin usa totais do time; usuário usa seus próprios
-  const todosCreated = isAdmin ? (team?.total_todos_created ?? 0) : (myIndicators?.todos_created ?? 0)
-  const todosCompleted = isAdmin ? (team?.total_todos_completed ?? 0) : (myIndicators?.todos_completed ?? 0)
-  const comments = isAdmin ? (team?.total_comments ?? 0) : (myIndicators?.comments_count ?? 0)
+  const todosCreated = isAdmin ? (team?.total_todos_created ?? 0) : (personal?.todosAssignedTotal ?? 0)
+  const todosCompleted = isAdmin ? (team?.total_todos_completed ?? 0) : (personal?.todosAssignedCompleted ?? 0)
+  const comments = isAdmin ? (team?.total_comments ?? 0) : (personal?.commentsCount ?? 0)
+  const activitiesAssigned = isAdmin ? (team?.total_activities ?? 0) : (personal?.activitiesAssigned ?? 0)
   const todosPending = Math.max(0, todosCreated - todosCompleted)
   const completionRatePct =
     todosCreated > 0 ? Math.round((todosCompleted / todosCreated) * 100) : null
@@ -100,8 +98,8 @@ export default function Dashboard() {
           caption: 'Cadastrados no sistema',
         },
         {
-          label: isAdmin ? 'Atividades em aberto' : 'Minhas atividades abertas',
-          value: activitiesOpen.length,
+          label: isAdmin ? 'Atividades em aberto' : 'Minhas atividades',
+          value: isAdmin ? activitiesOpen.length : activitiesAssigned,
           icon: ClipboardList,
           iconColor: isLight ? '#D97706' : '#FBBF24',
           iconBg: isLight ? 'rgba(217,119,6,0.1)' : 'rgba(251,191,36,0.12)',
@@ -219,7 +217,7 @@ export default function Dashboard() {
                 {isAdmin ? 'TO-DOs do time' : 'Meus TO-DOs'}
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <DashboardBarRow label="Criados" value={todosCreated} max={maxTodoBar} color="primary.main" />
+                <DashboardBarRow label={isAdmin ? 'Criados' : 'Atribuídos'} value={todosCreated} max={maxTodoBar} color="primary.main" />
                 <DashboardBarRow label="Concluídos" value={todosCompleted} max={maxTodoBar} color="success.main" />
               </Box>
             </Paper>
@@ -293,10 +291,10 @@ export default function Dashboard() {
             <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
               <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
                 <Typography variant="subtitle2" fontWeight={600}>
-                  {isAdmin ? 'Atividades em aberto' : 'Minhas atividades em aberto'}
+                  {isAdmin ? 'Atividades em aberto' : 'Minhas atividades'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Até 8 itens — veja todas em Indicadores
+                  Até 8 itens — veja todos em Indicadores
                 </Typography>
               </Box>
               <TableContainer>

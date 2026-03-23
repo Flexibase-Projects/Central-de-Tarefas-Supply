@@ -3,6 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { Project } from '@/types';
 import { KanbanCard } from './kanban-card';
+import { useProjectTodoCardSummary } from '@/hooks/use-project-todo-card-summary';
 
 interface KanbanColumnProps {
   id: string;
@@ -25,6 +26,7 @@ export function KanbanColumn({
   const highlight = isOver || isDraggedOver;
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
+  const { summariesByProjectId } = useProjectTodoCardSummary();
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 280, maxWidth: 280 }}>
@@ -76,7 +78,12 @@ export function KanbanColumn({
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
             {projects.map((project) => (
-              <KanbanCard key={project.id} project={project} onClick={() => onProjectClick(project)} />
+              <KanbanCard
+                key={project.id}
+                project={project}
+                onClick={() => onProjectClick(project)}
+                summary={summariesByProjectId[project.id] ?? null}
+              />
             ))}
 
             {/* Placeholder de drop */}

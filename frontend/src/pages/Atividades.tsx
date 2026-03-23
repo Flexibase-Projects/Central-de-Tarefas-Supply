@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Box, CircularProgress, Fab, Typography } from '@mui/material'
 import { Plus } from '@/components/ui/icons'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
@@ -7,16 +7,40 @@ import { CreateActivityDialog } from '@/components/kanban/create-activity-dialog
 import { useActivities } from '@/hooks/use-activities'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { usePermissions } from '@/hooks/use-permissions'
-import { Activity } from '@/types'
-import { Project } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
+import { Activity, Project } from '@/types'
+import { useSearchParams } from 'react-router-dom'
+
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+async function findActivityIdByTodo(params: {
+  activityIds: string[]
+  todoId: string
+  getAuthHeaders: () => Record<string, string>
+}): Promise<string | null> {
+  const { activityIds, todoId, getAuthHeaders } = params
+  const results = await Promise.all(
+    activityIds.map(async (activityId) => {
+      const url = API_URL ? `${API_URL}/api/todos/by-activity/${activityId}` : `/api/todos/by-activity/${activityId}`
+      const response = await fetch(url, { headers: getAuthHeaders() })
+      if (!response.ok) return null
+      const todos = await response.json()
+      return Array.isArray(todos) && todos.some((todo) => todo?.id === todoId) ? activityId : null
+    }),
+  )
+
+  return results.find(Boolean) ?? null
+}
 
 export default function Atividades() {
   const { activities, loading, createActivity, updateActivity, moveActivity, deleteActivity } = useActivities()
   const { hasRole } = usePermissions()
+  const { getAuthHeaders } = useAuth()
   const isAdmin = hasRole('admin')
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const projectsAsActivities: Project[] = activities.map((activity) => ({
     id: activity.id,
@@ -33,8 +57,57 @@ export default function Atividades() {
     created_by: activity.created_by,
   }))
 
+  useEffect(() => {
+    const activityId = searchParams.get('activity')
+    const todoId = searchParams.get('todo')
+
+    if (activities.length === 0 || isActivityDialogOpen || (!activityId && !todoId)) {
+      return
+    }
+
+    let cancelled = false
+
+    const openActivity = (targetActivityId: string | null) => {
+      if (!targetActivityId || cancelled) {
+        setSearchParams({}, { replace: true })
+        return
+      }
+
+      const activity = activities.find((item) => item.id === targetActivityId)
+      if (activity) {
+        setSelectedActivity(activity)
+        setIsActivityDialogOpen(true)
+      }
+      setSearchParams({}, { replace: true })
+    }
+
+    if (activityId) {
+      openActivity(activityId)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (todoId) {
+      void findActivityIdByTodo({
+        activityIds: activities.map((activity) => activity.id),
+        todoId,
+        getAuthHeaders,
+      }).then((resolvedActivityId) => {
+        openActivity(resolvedActivityId)
+      }).catch((error) => {
+        console.error('Error resolving activity by todo:', error)
+        setSearchParams({}, { replace: true })
+      })
+    }
+
+    return () => {
+      cancelled = true
+    }
+  }, [activities, getAuthHeaders, isActivityDialogOpen, searchParams, setSearchParams])
+
   const handleProjectClick = (project: Project) => {
-    const activity = activities.find((a) => a.id === project.id)
+    const activity = activities.find((item) => item.id === project.id)
     if (activity) {
       setSelectedActivity(activity)
       setIsActivityDialogOpen(true)
@@ -103,7 +176,7 @@ export default function Atividades() {
             Atividades
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-            Kanban de atividades da equipe — arraste os cards entre as colunas e abra um card para ver detalhes, to-dos e comentários.
+            Kanban de atividades da equipe - arraste os cards entre as colunas e abra um card para ver detalhes, to-dos e comentarios.
           </Typography>
         </Box>
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', px: 3, pt: 0.5, pb: 3 }}>

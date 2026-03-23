@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   Box,
   Typography,
@@ -23,10 +24,8 @@ import {
   Folder,
   ClipboardList,
 } from '@/components/ui/icons'
-import { useIndicators } from '@/hooks/use-indicators'
+import { useIndicators, type RecentAssignedTodo } from '@/hooks/use-indicators'
 import { useAuth } from '@/contexts/AuthContext'
-import type { ProjectIndicator, ActivityIndicator } from '@/types'
-import { useMemo } from 'react'
 
 const STATUS_LABELS: Record<string, string> = {
   backlog: 'Backlog',
@@ -47,6 +46,18 @@ function StatusChip({ status }: { status: string }) {
         ? 'primary'
         : 'default'
   return <Chip size="small" label={label} color={color} variant="outlined" sx={{ height: 22 }} />
+}
+
+function TodoStatusChip({ completed }: { completed: boolean }) {
+  return (
+    <Chip
+      size="small"
+      label={completed ? 'Concluído' : 'Pendente'}
+      color={completed ? 'success' : 'default'}
+      variant={completed ? 'filled' : 'outlined'}
+      sx={{ height: 22 }}
+    />
+  )
 }
 
 function BarChartRow({
@@ -88,22 +99,50 @@ function BarChartRow({
   )
 }
 
+function formatDate(value: string | null) {
+  if (!value) return '—'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return parsed.toLocaleDateString('pt-BR')
+}
+
+function getTodoScopeLabel(todo: RecentAssignedTodo) {
+  if (todo.activityName) return `Atividade · ${todo.activityName}`
+  if (todo.projectName) return `Projeto · ${todo.projectName}`
+  return '—'
+}
+
 export default function Indicadores() {
   const { data, loading, error } = useIndicators()
-  const { currentUser, hasRole } = useAuth()
+  const { hasRole } = useAuth()
   const isAdmin = hasRole('admin')
 
-  // Dados do próprio usuário
-  const myIndicators = useMemo(
-    () => data?.by_user?.find((u) => u.user_id === currentUser?.id) ?? null,
-    [data?.by_user, currentUser?.id],
-  )
+  const personal = data?.personal
+  const team = data?.team
+  const byUser = data?.by_user ?? []
+  const byProject = data?.by_project ?? []
+  const byActivity = data?.by_activity ?? []
+  const recentTodos = data?.recentAssignedTodos ?? []
 
-  // Atividades filtradas: admin vê todas; usuário vê só as suas
-  const visibleActivities = useMemo(() => {
-    const list = data?.by_activity ?? []
-    return isAdmin ? list : list.filter((a) => a.assigned_to === currentUser?.id)
-  }, [data?.by_activity, isAdmin, currentUser?.id])
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    byUser.forEach((u) => map.set(u.user_id, u.name))
+    return map
+  }, [byUser])
+
+  const todosAssignedTotal = personal?.todosAssignedTotal ?? 0
+  const todosAssignedCompleted = personal?.todosAssignedCompleted ?? 0
+  const todosAssignedOpen = personal?.todosAssignedOpen ?? Math.max(0, todosAssignedTotal - todosAssignedCompleted)
+  const personalComments = personal?.commentsCount ?? 0
+  const personalActivities = personal?.activitiesAssigned ?? 0
+
+  const cardTodosCreated = isAdmin ? (team?.total_todos_created ?? 0) : todosAssignedTotal
+  const cardTodosCompleted = isAdmin ? (team?.total_todos_completed ?? 0) : todosAssignedCompleted
+  const cardComments = isAdmin ? (team?.total_comments ?? 0) : personalComments
+  const cardActivities = isAdmin ? (team?.total_activities ?? 0) : personalActivities
+
+  const maxTodosProject = Math.max(1, ...byProject.map((p) => p.todos_count))
+  const maxTodosAssigned = Math.max(1, todosAssignedTotal, todosAssignedCompleted)
 
   if (loading) {
     return (
@@ -125,33 +164,20 @@ export default function Indicadores() {
     return null
   }
 
-  const { team, by_user, by_project } = data
-
-  // Totais para os cards: admin usa time; usuário usa os seus
-  const myTodosCreated = myIndicators?.todos_created ?? 0
-  const myTodosCompleted = myIndicators?.todos_completed ?? 0
-  const myComments = myIndicators?.comments_count ?? 0
-  const myActivitiesAssigned = myIndicators?.activities_assigned ?? 0
-
-  const cardTodosCreated = isAdmin ? team.total_todos_created : myTodosCreated
-  const cardTodosCompleted = isAdmin ? team.total_todos_completed : myTodosCompleted
-  const cardComments = isAdmin ? team.total_comments : myComments
-  const cardActivities = isAdmin ? team.total_activities : myActivitiesAssigned
-
-  const maxTodosProject = Math.max(1, ...by_project.map((p) => p.todos_count))
-  const maxTodosUser = Math.max(1, ...by_user.map((u) => u.todos_created + u.todos_completed))
-
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 2.5 }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
         {isAdmin ? 'Indicadores do time' : 'Meus indicadores'}
       </Typography>
 
-      {/* Cards resumo */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: isAdmin ? 'repeat(6, 1fr)' : 'repeat(5, 1fr)' },
+          gridTemplateColumns: {
+            xs: '1fr 1fr',
+            sm: 'repeat(3, 1fr)',
+            md: isAdmin ? 'repeat(6, 1fr)' : 'repeat(5, 1fr)',
+          },
           gap: 1.5,
           mb: 3,
         }}
@@ -166,11 +192,12 @@ export default function Indicadores() {
                 </Typography>
               </Box>
               <Typography variant="h5" fontWeight={700}>
-                {team.total_users}
+                {team?.total_users ?? 0}
               </Typography>
             </CardContent>
           </Card>
         )}
+
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
@@ -180,10 +207,11 @@ export default function Indicadores() {
               </Typography>
             </Box>
             <Typography variant="h5" fontWeight={700}>
-              {team.total_projects}
+              {team?.total_projects ?? 0}
             </Typography>
           </CardContent>
         </Card>
+
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
@@ -197,6 +225,7 @@ export default function Indicadores() {
             </Typography>
           </CardContent>
         </Card>
+
         <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
@@ -210,25 +239,39 @@ export default function Indicadores() {
             </Typography>
           </CardContent>
         </Card>
-        <Card variant="outlined" sx={{ bgcolor: 'background.paper', borderRadius: 2 }}>
+
+        <Card
+          variant="outlined"
+          sx={{
+            bgcolor: isAdmin ? 'background.paper' : 'rgba(37,99,235,0.06)',
+            borderRadius: 2,
+            borderColor: isAdmin ? 'divider' : 'primary.light',
+          }}
+        >
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
               <List size={18} />
               <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                TO-DOs criados
+                {isAdmin ? 'TO-DOs criados' : 'TO-DOs atribuídos'}
               </Typography>
             </Box>
             <Typography variant="h5" fontWeight={700}>
               {cardTodosCreated}
             </Typography>
+            {!isAdmin && (
+              <Typography variant="caption" color="text.secondary">
+                {todosAssignedOpen} pendentes
+              </Typography>
+            )}
           </CardContent>
         </Card>
+
         <Card variant="outlined" sx={{ bgcolor: 'success.main', color: 'success.contrastText', borderRadius: 2 }}>
           <CardContent sx={{ py: 1.5, px: 1.5, '&:last-child': { pb: 1.5 } }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25 }}>
               <CheckCircle size={18} />
               <Typography variant="caption" sx={{ opacity: 0.95 }} fontWeight={600}>
-                TO-DOs concluídos
+                {isAdmin ? 'TO-DOs concluídos' : 'TO-DOs concluídos'}
               </Typography>
             </Box>
             <Typography variant="h5" fontWeight={700}>
@@ -238,7 +281,6 @@ export default function Indicadores() {
         </Card>
       </Box>
 
-      {/* Gráfico: TO-DOs criados vs concluídos */}
       {(cardTodosCreated > 0 || cardTodosCompleted > 0) && (
         <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
           <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ mb: 1.5 }}>
@@ -246,15 +288,15 @@ export default function Indicadores() {
           </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <BarChartRow
-              label="Criados"
+              label={isAdmin ? 'Criados' : 'Atribuídos'}
               value={cardTodosCreated}
-              max={Math.max(cardTodosCreated, cardTodosCompleted, 1)}
+              max={maxTodosAssigned}
               color="primary.main"
             />
             <BarChartRow
               label="Concluídos"
               value={cardTodosCompleted}
-              max={Math.max(cardTodosCreated, cardTodosCompleted, 1)}
+              max={maxTodosAssigned}
               color="success.main"
             />
           </Box>
@@ -263,8 +305,7 @@ export default function Indicadores() {
 
       <Divider sx={{ my: 2 }} />
 
-      {/* Por usuário — apenas admin */}
-      {isAdmin && (
+      {isAdmin ? (
         <>
           <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
             Por usuário
@@ -283,7 +324,7 @@ export default function Indicadores() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {by_user.length === 0 ? (
+                  {byUser.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} align="center" sx={{ ...tableCellCompact, py: 2 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -292,7 +333,7 @@ export default function Indicadores() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    by_user.map((u, idx) => (
+                    byUser.map((u, idx) => (
                       <TableRow key={u.user_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
                         <TableCell sx={tableCellCompact}>
                           <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
@@ -318,18 +359,18 @@ export default function Indicadores() {
               </Table>
             </TableContainer>
             <Divider />
-            {by_user.length > 0 && (
+            {byUser.length > 0 && (
               <Box sx={{ p: 1.5 }}>
                 <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
                   TO-DOs criados por usuário
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  {by_user.slice(0, 8).map((u) => (
+                  {byUser.slice(0, 8).map((u) => (
                     <BarChartRow
                       key={u.user_id}
                       label={u.name}
                       value={u.todos_created + u.todos_completed}
-                      max={maxTodosUser}
+                      max={Math.max(1, ...byUser.map((item) => item.todos_created + item.todos_completed))}
                       color="primary.main"
                     />
                   ))}
@@ -339,9 +380,74 @@ export default function Indicadores() {
           </Paper>
           <Divider sx={{ my: 2 }} />
         </>
+      ) : (
+        <>
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
+            Últimos to-dos atribuídos
+          </Typography>
+          <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>TO-DO</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Origem</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atribuído em</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Prazo</TableCell>
+                    <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600 }}>XP</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentTodos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhum to-do foi atribuído a você ainda.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    recentTodos.map((todo: RecentAssignedTodo, idx: number) => (
+                      <TableRow key={todo.id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
+                            {todo.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }} noWrap>
+                            {getTodoScopeLabel(todo)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={tableCellCompact}>
+                          <TodoStatusChip completed={todo.completed} />
+                        </TableCell>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                            {formatDate(todo.assignedAt)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                            {formatDate(todo.deadline)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right" sx={tableCellCompact}>
+                          <Typography component="span" color="primary.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
+                            {todo.xpReward}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
       )}
 
-      {/* Por projeto */}
       <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
         Por projeto
       </Typography>
@@ -358,30 +464,36 @@ export default function Indicadores() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {by_project.length === 0 ? (
+              {byProject.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ ...tableCellCompact, py: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Nenhum projeto cadastrado.
+                      {isAdmin ? 'Nenhum projeto cadastrado.' : 'Nenhum projeto com to-dos atribuídos.'}
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                by_project.map((p: ProjectIndicator, idx: number) => (
+                byProject.map((p, idx) => (
                   <TableRow key={p.project_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
                     <TableCell sx={tableCellCompact}>
                       <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
                         {p.project_name}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={tableCellCompact}><StatusChip status={p.project_status} /></TableCell>
-                    <TableCell align="right" sx={tableCellCompact}>{p.todos_count}</TableCell>
+                    <TableCell sx={tableCellCompact}>
+                      <StatusChip status={p.project_status} />
+                    </TableCell>
+                    <TableCell align="right" sx={tableCellCompact}>
+                      {p.todos_count}
+                    </TableCell>
                     <TableCell align="right" sx={tableCellCompact}>
                       <Typography component="span" color="success.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
                         {p.todos_completed}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right" sx={tableCellCompact}>{p.comments_count}</TableCell>
+                    <TableCell align="right" sx={tableCellCompact}>
+                      {p.comments_count}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -389,13 +501,13 @@ export default function Indicadores() {
           </Table>
         </TableContainer>
         <Divider />
-        {by_project.length > 0 && (
+        {byProject.length > 0 && (
           <Box sx={{ p: 1.5 }}>
             <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
               TO-DOs por projeto
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {by_project.slice(0, 10).map((p) => (
+              {byProject.slice(0, 10).map((p) => (
                 <BarChartRow
                   key={p.project_id}
                   label={p.project_name}
@@ -409,65 +521,62 @@ export default function Indicadores() {
         )}
       </Paper>
 
-      <Divider sx={{ my: 2 }} />
-
-      {/* Atividades */}
-      <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
-        {isAdmin ? 'Atividades' : 'Minhas atividades'}
-      </Typography>
-      <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
-                <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atividade</TableCell>
-                <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
-                {isAdmin && (
-                  <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atribuído a</TableCell>
-                )}
-                <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Prazo</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {visibleActivities.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={isAdmin ? 4 : 3} align="center" sx={{ ...tableCellCompact, py: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {isAdmin ? 'Nenhuma atividade cadastrada.' : 'Você não tem atividades atribuídas.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                visibleActivities.map((a: ActivityIndicator, idx: number) => {
-                  const userNameById = new Map(data.by_user.map((u) => [u.user_id, u.name]))
-                  return (
-                    <TableRow key={a.activity_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
-                      <TableCell sx={tableCellCompact}>
-                        <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
-                          {a.activity_name}
+      {isAdmin && (
+        <>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
+            Atividades
+          </Typography>
+          <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atividade</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atribuído a</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Prazo</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {byActivity.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhuma atividade cadastrada.
                         </Typography>
                       </TableCell>
-                      <TableCell sx={tableCellCompact}><StatusChip status={a.status} /></TableCell>
-                      {isAdmin && (
+                    </TableRow>
+                  ) : (
+                    byActivity.map((a, idx) => (
+                      <TableRow key={a.activity_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
+                            {a.activity_name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={tableCellCompact}>
+                          <StatusChip status={a.status} />
+                        </TableCell>
                         <TableCell sx={tableCellCompact}>
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
                             {a.assigned_to ? userNameById.get(a.assigned_to) ?? '—' : '—'}
                           </Typography>
                         </TableCell>
-                      )}
-                      <TableCell sx={tableCellCompact}>
-                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
-                          {a.due_date ? new Date(a.due_date).toLocaleDateString('pt-BR') : '—'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                        <TableCell sx={tableCellCompact}>
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                            {a.due_date ? new Date(a.due_date).toLocaleDateString('pt-BR') : '—'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </>
+      )}
     </Box>
   )
 }

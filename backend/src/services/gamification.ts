@@ -32,6 +32,11 @@ interface LinkedAchievementReward {
   percent: number;
 }
 
+interface TodoCompletionCycleState {
+  openCompletionLogId: string | null;
+  openCompletionXp: number;
+}
+
 const ROUND_FACTOR = 100;
 
 function roundXp(value: number): number {
@@ -121,6 +126,48 @@ async function hasXpLogEntry(
   return (data?.length ?? 0) > 0;
 }
 
+async function getTodoCompletionCycleState(
+  userId: string,
+  todoId: string,
+): Promise<TodoCompletionCycleState> {
+  const { data, error } = await supabase
+    .from('cdt_user_xp_log')
+    .select('id, xp_amount, reason, created_at')
+    .eq('user_id', userId)
+    .eq('related_id', todoId)
+    .eq('related_type', 'todo')
+    .in('reason', ['todo_completed', 'todo_uncompleted'])
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
+
+  if (error || !data) {
+    return { openCompletionLogId: null, openCompletionXp: 0 };
+  }
+
+  const stack: Array<{ id: string; xpAmount: number }> = [];
+
+  for (const row of data as Array<{
+    id: string;
+    xp_amount: number | null;
+    reason: string;
+  }>) {
+    if (row.reason === 'todo_completed') {
+      stack.push({ id: row.id, xpAmount: roundXp(parseNumber(row.xp_amount, 0)) });
+      continue;
+    }
+
+    if (row.reason === 'todo_uncompleted' && stack.length > 0) {
+      stack.pop();
+    }
+  }
+
+  const open = stack.at(-1);
+  return {
+    openCompletionLogId: open?.id ?? null,
+    openCompletionXp: open?.xpAmount ?? 0,
+  };
+}
+
 async function insertXpLog(params: {
   userId: string;
   xpAmount: number;
@@ -129,7 +176,7 @@ async function insertXpLog(params: {
   relatedType: string;
 }): Promise<boolean> {
   const rounded = roundXp(params.xpAmount);
-  if (rounded <= 0) return false;
+  if (rounded === 0) return false;
   const { error } = await supabase.from('cdt_user_xp_log').insert({
     user_id: params.userId,
     xp_amount: rounded,
@@ -356,21 +403,43 @@ export async function awardTodoCompletionXp(params: {
   userId: string;
   todoId: string;
   xpAmount: number;
-}): Promise<boolean> {
-  const alreadyAwarded = await hasXpLogEntry(
-    params.userId,
-    'todo_completed',
-    params.todoId,
-    'todo',
-  );
-  if (alreadyAwarded) return false;
-  return insertXpLog({
+}): Promise<{ awarded: boolean; xpDelta: number }> {
+  const cycleState = await getTodoCompletionCycleState(params.userId, params.todoId);
+  const roundedXp = roundXp(params.xpAmount);
+  if (cycleState.openCompletionLogId) {
+    return { awarded: false, xpDelta: 0 };
+  }
+  const inserted = await insertXpLog({
     userId: params.userId,
-    xpAmount: params.xpAmount,
+    xpAmount: roundedXp,
     reason: 'todo_completed',
     relatedId: params.todoId,
     relatedType: 'todo',
   });
+  return { awarded: inserted, xpDelta: inserted ? roundedXp : 0 };
+}
+
+export async function revertTodoCompletionXp(params: {
+  userId: string;
+  todoId: string;
+}): Promise<{ reverted: boolean; xpDelta: number }> {
+  const cycleState = await getTodoCompletionCycleState(params.userId, params.todoId);
+  if (!cycleState.openCompletionLogId || cycleState.openCompletionXp === 0) {
+    return { reverted: false, xpDelta: 0 };
+  }
+
+  const reverted = await insertXpLog({
+    userId: params.userId,
+    xpAmount: -Math.abs(cycleState.openCompletionXp),
+    reason: 'todo_uncompleted',
+    relatedId: params.todoId,
+    relatedType: 'todo',
+  });
+
+  return {
+    reverted,
+    xpDelta: reverted ? -Math.abs(cycleState.openCompletionXp) : 0,
+  };
 }
 
 export async function awardActivityCompletionXp(params: {
@@ -469,4 +538,3 @@ export async function evaluateAndAwardGlobalAchievements(userId: string): Promis
     if (!unlockedInPass) break;
   }
 }
-

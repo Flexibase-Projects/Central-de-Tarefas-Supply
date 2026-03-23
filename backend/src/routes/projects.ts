@@ -15,9 +15,16 @@ function getRequesterId(req: express.Request): string | null {
 
 type ProjectTodoSummaryRow = {
   project_id: string | null;
+  activity_id?: string | null;
   assigned_to: string | null;
   completed: boolean | null;
   xp_reward: number | null;
+};
+
+type ActivitySummaryRow = {
+  id: string;
+  name: string;
+  status: string;
 };
 
 function parseNumber(value: unknown, fallback = 0): number {
@@ -199,34 +206,41 @@ router.get('/todo-card-summary', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const [projects, todosRes] = await Promise.all([
+    const [projects, activitiesRes, todosRes] = await Promise.all([
       fetchOrderedProjects(),
       supabase
+        .from('cdt_activities')
+        .select('id, name, status')
+        .order('created_at', { ascending: false }),
+      supabase
         .from('cdt_project_todos')
-        .select('project_id, assigned_to, completed, xp_reward')
-        .not('project_id', 'is', null),
+        .select('project_id, activity_id, assigned_to, completed, xp_reward'),
     ]);
 
+    if (activitiesRes.error) throw activitiesRes.error;
     if (todosRes.error) throw todosRes.error;
 
     const todos = (todosRes.data ?? []) as ProjectTodoSummaryRow[];
-    const todoCountByProject = new Map<string, { myAssignedOpenCount: number; xpPendingCount: number }>();
+    const activities = (activitiesRes.data ?? []) as ActivitySummaryRow[];
+    const todoCountByEntity = new Map<string, { myAssignedOpenCount: number; xpPendingCount: number }>();
 
     for (const todo of todos) {
-      if (!todo.project_id) continue;
-      const current = todoCountByProject.get(todo.project_id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      const entityId = todo.project_id ?? todo.activity_id ?? null;
+      if (!entityId) continue;
+      const current = todoCountByEntity.get(entityId) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
       if (todo.assigned_to === requesterId && todo.completed !== true) {
         current.myAssignedOpenCount += 1;
       }
       if (parseNumber(todo.xp_reward, 0) <= 0) {
         current.xpPendingCount += 1;
       }
-      todoCountByProject.set(todo.project_id, current);
+      todoCountByEntity.set(entityId, current);
     }
 
-    const summary = projects.map((project: { id: string; name: string; status: string }) => {
-      const counts = todoCountByProject.get(project.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+    const projectSummary = projects.map((project: { id: string; name: string; status: string }) => {
+      const counts = todoCountByEntity.get(project.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
       return {
+        entity_type: 'project',
         project_id: project.id,
         project_name: project.name,
         project_status: project.status,
@@ -235,7 +249,19 @@ router.get('/todo-card-summary', async (req, res) => {
       };
     });
 
-    return res.json(summary);
+    const activitySummary = activities.map((activity) => {
+      const counts = todoCountByEntity.get(activity.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      return {
+        entity_type: 'activity',
+        project_id: activity.id,
+        project_name: activity.name,
+        project_status: activity.status,
+        myAssignedOpenCount: counts.myAssignedOpenCount,
+        xpPendingCount: counts.xpPendingCount,
+      };
+    });
+
+    return res.json([...projectSummary, ...activitySummary]);
   } catch (error: any) {
     console.error('Error fetching todo card summary:', error);
     return res.status(500).json({ error: error.message || 'Failed to fetch todo card summary' });

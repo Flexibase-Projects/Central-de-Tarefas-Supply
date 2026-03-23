@@ -72,6 +72,7 @@ export interface ProjectTodo {
   deadline?: string | null  // ISO date
   achievement_id?: string | null
   completed_at?: string | null
+  assigned_at?: string | null
 }
 
 export interface GitHubCommit {
@@ -192,6 +193,12 @@ export interface Notification {
   created_at: string
 }
 
+export interface TodoMutationResponse {
+  todo: ProjectTodo
+  xpDelta?: number | null
+  xpAction?: 'awarded' | 'reversed' | 'retroactive' | 'none' | string | null
+}
+
 export interface UserIndicator {
   user_id: string
   name: string
@@ -230,7 +237,39 @@ export interface TeamTotals {
   total_todos_completed: number
 }
 
+export interface IndicatorsPersonalSummary {
+  commentsCount: number
+  todosAssignedTotal: number
+  todosAssignedCompleted: number
+  todosAssignedOpen: number
+  activitiesAssigned: number
+}
+
+export interface RecentAssignedTodo {
+  id: string
+  title: string
+  completed: boolean
+  assignedAt: string | null
+  deadline: string | null
+  projectName: string | null
+  activityName: string | null
+  xpReward: number
+  projectId?: string | null
+  activityId?: string | null
+}
+
+export interface ProjectTodoCardSummary {
+  project_id: string
+  project_name: string
+  project_status: string
+  myAssignedOpenCount: number
+  xpPendingCount: number
+}
+
 export interface IndicatorsData {
+  scope: 'team' | 'me'
+  personal: IndicatorsPersonalSummary
+  recentAssignedTodos: RecentAssignedTodo[]
   by_user: UserIndicator[]
   by_project: ProjectIndicator[]
   by_activity: ActivityIndicator[]

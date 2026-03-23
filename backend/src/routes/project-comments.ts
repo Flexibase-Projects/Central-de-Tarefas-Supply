@@ -51,6 +51,10 @@ router.get('/:projectId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { project_id, activity_id, content, author_name, author_email } = req.body;
+    const createdBy =
+      ((req as express.Request & { userId?: string }).userId ?? null) ||
+      (req.headers['x-user-id'] as string | undefined) ||
+      null;
 
     const hasProject = Boolean(project_id);
     const hasActivity = Boolean(activity_id);
@@ -67,6 +71,7 @@ router.post('/', async (req, res) => {
         activity_id: hasActivity ? activity_id : null,
         task_id: null,
         content,
+        created_by: createdBy,
         author_name: author_name || null,
         author_email: author_email || null,
       })

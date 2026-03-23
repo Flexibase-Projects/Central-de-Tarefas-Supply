@@ -43,11 +43,16 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+type TodoEntity = ProjectTodo & {
+  assigned_at?: string | null
+}
 
-// ---------------------------------------------------------------------------
-// XP float animation
-// ---------------------------------------------------------------------------
+type TodoMutationResponse = {
+  todo: TodoEntity
+  xpDelta?: number | null
+  xpAction?: string | null
+}
+
 function formatXp(value: number): string {
   if (!Number.isFinite(value)) return '0.00'
   return value.toFixed(2)
@@ -66,40 +71,17 @@ function triggerXpFloat(xp: number, event: React.MouseEvent | null) {
 function triggerXpDeduction(xp: number, event: React.MouseEvent | null) {
   const el = document.createElement('div')
   el.className = 'xp-float-anim xp-deduction-anim'
-  el.textContent = `−${formatXp(xp)} XP`
+  el.textContent = `-${formatXp(xp)} XP`
   el.style.left = event ? `${event.clientX - 20}px` : '50%'
   el.style.top = event ? `${event.clientY - 10}px` : '50%'
   document.body.appendChild(el)
   setTimeout(() => el.remove(), 1500)
 }
 
-// ---------------------------------------------------------------------------
-// Notifica admins sobre TO-DO sem XP
-// ---------------------------------------------------------------------------
-async function notifyAdminsAboutMissingXp(
-  todoTitle: string,
-  contextName: string,
-  headers: Record<string, string>,
-) {
-  try {
-    await fetch(`${API_URL}/api/notifications`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        type: 'todo_no_xp',
-        title: 'TO-DO sem XP definido',
-        message: `O TO-DO "${todoTitle}" (em "${contextName}") foi criado sem XP. Acesse o card para definir o valor.`,
-        target_role: 'admin',
-      }),
-    })
-  } catch {
-    // silencioso — notificação é secundária
-  }
+function isXpPending(todo: TodoEntity): boolean {
+  return Number(todo.xp_reward ?? 0) <= 0
 }
 
-// ---------------------------------------------------------------------------
-// Interfaces
-// ---------------------------------------------------------------------------
 type TodoListProps = (
   | { projectId: string; activityId?: never; contextName?: string }
   | { activityId: string; projectId?: never; contextName?: string }
@@ -109,7 +91,7 @@ type TodoListProps = (
 }
 
 interface TodoItemProps {
-  todo: ProjectTodo
+  todo: TodoEntity
   onToggle: (id: string, completed: boolean, event: React.MouseEvent) => void
   onDelete: (id: string) => void
   onAssign: (id: string, userId: string | null) => void
@@ -118,11 +100,10 @@ interface TodoItemProps {
   usersLoading: boolean
   isHighlighted?: boolean
   canManage: boolean
+  canToggle: boolean
+  currentUserId: string | null
 }
 
-// ---------------------------------------------------------------------------
-// TodoItem
-// ---------------------------------------------------------------------------
 const TodoItem = memo(function TodoItem({
   todo,
   onToggle,
@@ -133,6 +114,8 @@ const TodoItem = memo(function TodoItem({
   usersLoading,
   isHighlighted,
   canManage,
+  canToggle,
+  currentUserId,
 }: TodoItemProps) {
   const {
     attributes,
@@ -148,6 +131,16 @@ const TodoItem = memo(function TodoItem({
   const [editingXp, setEditingXp] = React.useState(false)
   const [xpInputVal, setXpInputVal] = React.useState<string>('')
 
+  const mine = Boolean(todo.assigned_to && todo.assigned_to === currentUserId)
+  const pendingXp = isXpPending(todo)
+  const assigneeName = users.find((u) => u.id === todo.assigned_to)?.name || 'Sem responsável'
+  const checkboxDisabled = !canToggle
+  const toggleTooltip = !todo.assigned_to && !canManage
+    ? 'Defina um responsável para concluir'
+    : !canToggle
+      ? 'Apenas o responsável pode concluir'
+      : ''
+
   React.useEffect(() => {
     if (isHighlighted && itemRef.current) {
       setTimeout(() => {
@@ -156,9 +149,8 @@ const TodoItem = memo(function TodoItem({
       setShouldHighlight(true)
       const timer = setTimeout(() => setShouldHighlight(false), 1500)
       return () => clearTimeout(timer)
-    } else {
-      setShouldHighlight(false)
     }
+    setShouldHighlight(false)
   }, [isHighlighted])
 
   const style = {
@@ -188,6 +180,24 @@ const TodoItem = memo(function TodoItem({
       })()
     : null
 
+  const emphasisSx = shouldHighlight
+    ? { bgcolor: 'warning.light', border: 2, borderColor: 'warning.main', boxShadow: 2 }
+    : mine
+      ? {
+          bgcolor: 'rgba(37,99,235,0.07)',
+          border: '1px solid rgba(37,99,235,0.22)',
+          boxShadow: 'inset 0 0 0 1px rgba(37,99,235,0.06)',
+        }
+      : canManage && pendingXp
+        ? {
+            bgcolor: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.22)',
+          }
+        : {
+            border: '1px solid transparent',
+            '&:hover': { bgcolor: 'action.hover' },
+          }
+
   function startEditXp() {
     setXpInputVal(todo.xp_reward ? String(todo.xp_reward) : '')
     setEditingXp(true)
@@ -215,9 +225,7 @@ const TodoItem = memo(function TodoItem({
         borderRadius: 1,
         width: '100%',
         transition: 'all 0.2s',
-        ...(shouldHighlight
-          ? { bgcolor: 'warning.light', border: 2, borderColor: 'warning.main', boxShadow: 2 }
-          : { '&:hover': { bgcolor: 'action.hover' }, '&:hover .delete-btn': { opacity: 1 }, '&:hover .xp-edit-btn': { opacity: 1 } }),
+        ...emphasisSx,
       }}
     >
       {canManage && (
@@ -226,19 +234,23 @@ const TodoItem = memo(function TodoItem({
         </Box>
       )}
 
-      <Checkbox
-        size="small"
-        checked={todo.completed}
-        onChange={(e) => {
-          const nativeEvent = e.nativeEvent as MouseEvent
-          onToggle(todo.id, e.target.checked, {
-            clientX: nativeEvent.clientX,
-            clientY: nativeEvent.clientY,
-          } as React.MouseEvent)
-        }}
-      />
+      <Tooltip title={toggleTooltip} arrow disableHoverListener={!toggleTooltip}>
+        <span>
+          <Checkbox
+            size="small"
+            checked={todo.completed}
+            disabled={checkboxDisabled}
+            onChange={(e) => {
+              const nativeEvent = e.nativeEvent as MouseEvent
+              onToggle(todo.id, e.target.checked, {
+                clientX: nativeEvent.clientX,
+                clientY: nativeEvent.clientY,
+              } as React.MouseEvent)
+            }}
+          />
+        </span>
+      </Tooltip>
 
-      {/* Title + chips */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
           variant="body2"
@@ -247,136 +259,175 @@ const TodoItem = memo(function TodoItem({
           {todo.title}
         </Typography>
 
-        {(todo.xp_reward || todo.deadline || todo.achievement_id || canManage) && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5, alignItems: 'center' }}>
-            {/* XP chip + edit inline */}
-            {canManage ? (
-              editingXp ? (
-                <ClickAwayListener onClickAway={commitXp}>
-                  <TextField
-                    size="small"
-                    autoFocus
-                    type="number"
-                    value={xpInputVal}
-                    onChange={(e) => setXpInputVal(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitXp()
-                      if (e.key === 'Escape') setEditingXp(false)
-                    }}
-                    inputProps={{ min: 0.01, max: 500, step: 0.01 }}
-                    placeholder="XP"
-                    sx={{ width: 90, '& input': { py: 0.25, fontSize: 11 } }}
-                    InputProps={{
-                      endAdornment: <InputAdornment position="end"><Typography variant="caption">XP</Typography></InputAdornment>,
-                    }}
-                  />
-                </ClickAwayListener>
-              ) : todo.xp_reward && todo.xp_reward > 0 ? (
-                <Tooltip title="Editar XP" arrow>
-                  <Chip
-                    size="small"
-                    label={`+${formatXp(todo.xp_reward)} XP`}
-                    onClick={startEditXp}
-                    sx={{
-                      height: 18,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      bgcolor: 'rgba(124,58,237,0.1)',
-                      color: '#7C3AED',
-                      border: '1px solid rgba(124,58,237,0.2)',
-                      cursor: 'pointer',
-                      '& .MuiChip-label': { px: 0.75 },
-                    }}
-                  />
-                </Tooltip>
-              ) : (
-                <Tooltip title="Definir XP" arrow>
-                  <Chip
-                    size="small"
-                    icon={<Pencil size={10} />}
-                    label="Definir XP"
-                    onClick={startEditXp}
-                    className="xp-edit-btn"
-                    sx={{
-                      height: 18,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      opacity: 0,
-                      bgcolor: 'rgba(124,58,237,0.06)',
-                      color: '#7C3AED',
-                      border: '1px dashed rgba(124,58,237,0.3)',
-                      cursor: 'pointer',
-                      transition: 'opacity 0.15s',
-                      '& .MuiChip-label': { px: 0.75 },
-                      '& .MuiChip-icon': { fontSize: 10, ml: 0.5 },
-                    }}
-                  />
-                </Tooltip>
-              )
-            ) : todo.xp_reward && todo.xp_reward > 0 ? (
-              <Chip
-                size="small"
-                label={`+${formatXp(todo.xp_reward)} XP`}
-                sx={{
-                  height: 18,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  bgcolor: 'rgba(124,58,237,0.1)',
-                  color: '#7C3AED',
-                  border: '1px solid rgba(124,58,237,0.2)',
-                  '& .MuiChip-label': { px: 0.75 },
-                }}
-              />
-            ) : null}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5, alignItems: 'center' }}>
+          {mine && (
+            <Chip
+              size="small"
+              label="Sua demanda"
+              sx={{
+                height: 18,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: 'rgba(37,99,235,0.12)',
+                color: '#2563EB',
+                border: '1px solid rgba(37,99,235,0.18)',
+                '& .MuiChip-label': { px: 0.75 },
+              }}
+            />
+          )}
 
-            {deadlineChip}
-
-            {todo.achievement_id && (
-              <Tooltip title="Tem conquista vinculada" arrow>
+          {canManage ? (
+            editingXp ? (
+              <ClickAwayListener onClickAway={commitXp}>
+                <TextField
+                  size="small"
+                  autoFocus
+                  type="number"
+                  value={xpInputVal}
+                  onChange={(e) => setXpInputVal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitXp()
+                    if (e.key === 'Escape') setEditingXp(false)
+                  }}
+                  inputProps={{ min: 0.01, max: 500, step: 0.01 }}
+                  placeholder="XP"
+                  sx={{ width: 96, '& input': { py: 0.25, fontSize: 11 } }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Typography variant="caption">XP</Typography>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </ClickAwayListener>
+            ) : pendingXp ? (
+              <Tooltip title="Atribuir XP" arrow>
                 <Chip
                   size="small"
-                  label="🏆"
+                  icon={<Pencil size={10} />}
+                  label="Atribuir XP"
+                  onClick={startEditXp}
                   sx={{
                     height: 18,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 700,
-                    bgcolor: 'rgba(245,158,11,0.1)',
-                    color: '#F59E0B',
-                    border: '1px solid rgba(245,158,11,0.3)',
+                    bgcolor: 'rgba(245,158,11,0.12)',
+                    color: '#B45309',
+                    border: '1px solid rgba(245,158,11,0.22)',
+                    cursor: 'pointer',
+                    '& .MuiChip-label': { px: 0.75 },
+                    '& .MuiChip-icon': { ml: 0.5 },
+                  }}
+                />
+              </Tooltip>
+            ) : (
+              <Tooltip title="Editar XP" arrow>
+                <Chip
+                  size="small"
+                  label={`+${formatXp(Number(todo.xp_reward ?? 0))} XP`}
+                  onClick={startEditXp}
+                  sx={{
+                    height: 18,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    bgcolor: 'rgba(124,58,237,0.1)',
+                    color: '#7C3AED',
+                    border: '1px solid rgba(124,58,237,0.2)',
+                    cursor: 'pointer',
                     '& .MuiChip-label': { px: 0.75 },
                   }}
                 />
               </Tooltip>
-            )}
-          </Box>
-        )}
+            )
+          ) : Number(todo.xp_reward ?? 0) > 0 ? (
+            <Chip
+              size="small"
+              label={`+${formatXp(Number(todo.xp_reward ?? 0))} XP`}
+              sx={{
+                height: 18,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: 'rgba(124,58,237,0.1)',
+                color: '#7C3AED',
+                border: '1px solid rgba(124,58,237,0.2)',
+                '& .MuiChip-label': { px: 0.75 },
+              }}
+            />
+          ) : mine ? (
+            <Chip
+              size="small"
+              label="XP pendente"
+              sx={{
+                height: 18,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: 'rgba(245,158,11,0.08)',
+                color: '#B45309',
+                border: '1px solid rgba(245,158,11,0.18)',
+                '& .MuiChip-label': { px: 0.75 },
+              }}
+            />
+          ) : null}
+
+          {deadlineChip}
+
+          {todo.achievement_id && (
+            <Tooltip title="Tem conquista vinculada" arrow>
+              <Chip
+                size="small"
+                label="🏆"
+                sx={{
+                  height: 18,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  bgcolor: 'rgba(245,158,11,0.1)',
+                  color: '#F59E0B',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  '& .MuiChip-label': { px: 0.75 },
+                }}
+              />
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
-      <Autocomplete
-        size="small"
-        sx={{ minWidth: 168, maxWidth: 220, flexShrink: 0 }}
-        disabled={todo.completed || !canManage}
-        loading={usersLoading}
-        options={users}
-        getOptionLabel={(u) => u.name || u.email || u.id}
-        isOptionEqualToValue={(a, b) => a.id === b.id}
-        value={users.find((u) => u.id === todo.assigned_to) ?? null}
-        onChange={(_, v) => onAssign(todo.id, v?.id ?? null)}
-        renderInput={(params) => (
-          <TextField {...params} placeholder="Responsável" size="small" />
-        )}
-        slotProps={{
-          popper: {
-            disablePortal: true,
-            placement: 'bottom-start',
-            sx: { zIndex: (t) => t.zIndex.modal + 2 },
-          },
-        }}
-        noOptionsText={usersLoading ? 'Carregando usuários…' : 'Nenhum usuário'}
-      />
+      {canManage ? (
+        <Autocomplete
+          size="small"
+          sx={{ minWidth: 168, maxWidth: 220, flexShrink: 0 }}
+          disabled={todo.completed}
+          loading={usersLoading}
+          options={users}
+          getOptionLabel={(u) => u.name || u.email || u.id}
+          isOptionEqualToValue={(a, b) => a.id === b.id}
+          value={users.find((u) => u.id === todo.assigned_to) ?? null}
+          onChange={(_, v) => onAssign(todo.id, v?.id ?? null)}
+          renderInput={(params) => (
+            <TextField {...params} placeholder="Responsável" size="small" />
+          )}
+          slotProps={{
+            popper: {
+              disablePortal: true,
+              placement: 'bottom-start',
+              sx: { zIndex: (t) => t.zIndex.modal + 2 },
+            },
+          }}
+          noOptionsText={usersLoading ? 'Carregando usuários…' : 'Nenhum usuário'}
+        />
+      ) : (
+        <Box sx={{ minWidth: 156, maxWidth: 200, flexShrink: 0, textAlign: 'right' }}>
+          <Typography variant="caption" fontWeight={600} sx={{ display: 'block', color: mine ? 'primary.main' : 'text.secondary' }}>
+            {assigneeName}
+          </Typography>
+          <Typography variant="caption" color="text.disabled">
+            {mine ? 'Atribuído a você' : 'Responsável'}
+          </Typography>
+        </Box>
+      )}
 
       {canManage && (
-        <IconButton className="delete-btn" size="small" onClick={() => onDelete(todo.id)} sx={{ opacity: 0 }}>
+        <IconButton className="delete-btn" size="small" onClick={() => onDelete(todo.id)}>
           <Trash2 size={16} />
         </IconButton>
       )}
@@ -384,11 +435,8 @@ const TodoItem = memo(function TodoItem({
   )
 })
 
-// ---------------------------------------------------------------------------
-// TodoList
-// ---------------------------------------------------------------------------
 export function TodoList(props: TodoListProps) {
-  const { highlightedTodoId, sharedTodos, contextName = '' } = props
+  const { highlightedTodoId, sharedTodos } = props
   const activityIdKey = 'activityId' in props ? props.activityId : undefined
   const projectIdKey = 'projectId' in props ? props.projectId : undefined
   const scope: TodosScope | null = useMemo(() => {
@@ -403,18 +451,13 @@ export function TodoList(props: TodoListProps) {
   const internal = useTodos(sharedTodos ? null : scope)
   const { todos, loading, createTodo, updateTodo, deleteTodo, reorderTodos } = sharedTodos ?? internal
   const { hasRole } = usePermissions()
-  const { currentUser, getAuthHeaders } = useAuth()
+  const { currentUser } = useAuth()
   const { users, loading: usersLoading, error: usersError } = useUsersList()
   const { achievements } = useAchievements()
   const isAdmin = hasRole('admin')
 
-  // Todos visíveis: admin vê todos; usuário vê apenas os atribuídos a si
-  const visibleTodos = useMemo(
-    () => isAdmin ? todos : todos.filter((t) => t.assigned_to === currentUser?.id),
-    [todos, isAdmin, currentUser?.id],
-  )
+  const visibleTodos = todos as TodoEntity[]
 
-  // Estados de criação
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [newTodoXp, setNewTodoXp] = useState(1)
   const [newTodoDeadline, setNewTodoDeadline] = useState('')
@@ -422,9 +465,7 @@ export function TodoList(props: TodoListProps) {
   const [newTodoAchievementId, setNewTodoAchievementId] = useState<string | null>(null)
   const [newTodoAssignee, setNewTodoAssignee] = useState<User | null>(null)
 
-  const linkedAchievements = achievements.filter(
-    (a) => (a.mode ?? 'global_auto') === 'linked_item'
-  )
+  const linkedAchievements = achievements.filter((a) => (a.mode ?? 'global_auto') === 'linked_item')
 
   if (usersError) console.error('Erro ao carregar usuários:', usersError)
 
@@ -440,9 +481,9 @@ export function TodoList(props: TodoListProps) {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
-      const oldIndex = todos.findIndex((t) => t.id === active.id)
-      const newIndex = todos.findIndex((t) => t.id === over.id)
-      const newTodos = arrayMove(todos, oldIndex, newIndex)
+      const oldIndex = visibleTodos.findIndex((t) => t.id === active.id)
+      const newIndex = visibleTodos.findIndex((t) => t.id === over.id)
+      const newTodos = arrayMove(visibleTodos, oldIndex, newIndex)
       try {
         await reorderTodos(newTodos.map((t) => t.id))
       } catch (error) {
@@ -451,14 +492,12 @@ export function TodoList(props: TodoListProps) {
     }
   }
 
-  // Admin precisa de: título + prazo + XP + responsável
   const canSubmitAdmin =
     Boolean(newTodoTitle.trim()) &&
     Boolean(newTodoDeadline) &&
     newTodoXp >= 0.01 &&
     newTodoAssignee != null
 
-  // Usuário precisa de: título + prazo (sem XP)
   const canSubmitUser =
     Boolean(newTodoTitle.trim()) &&
     Boolean(newTodoDeadline)
@@ -467,8 +506,8 @@ export function TodoList(props: TodoListProps) {
 
   const handleCreateTodo = async () => {
     if (!canSubmitNewTodo) return
-    // Usuário: assignee é o próprio; admin: usa o que selecionou
-    const assigneeId = isAdmin ? newTodoAssignee?.id ?? null : (currentUser?.id ?? null)
+
+    const assigneeId = isAdmin ? newTodoAssignee?.id ?? null : currentUser?.id ?? null
     if (!assigneeId) return
 
     const deadlineIso = newTodoDeadline
@@ -485,11 +524,6 @@ export function TodoList(props: TodoListProps) {
         deadline_bonus_percent: isAdmin ? newTodoDeadlineBonusPercent : 0,
         achievement_id: isAdmin ? (newTodoAchievementId || undefined) : undefined,
       })
-
-      // Se criado sem XP, notifica admins
-      if (!isAdmin) {
-        void notifyAdminsAboutMissingXp(newTodoTitle.trim(), contextName, getAuthHeaders())
-      }
 
       setNewTodoTitle('')
       setNewTodoXp(1)
@@ -516,7 +550,10 @@ export function TodoList(props: TodoListProps) {
   const handleUpdateXp = useCallback(
     async (todoId: string, xp: number) => {
       try {
-        await updateTodo(todoId, { xp_reward: xp })
+        const result = await updateTodo(todoId, { xp_reward: xp }) as TodoMutationResponse
+        if ((result.xpAction === 'retroactive' || result.xpAction === 'awarded') && Number(result.xpDelta ?? 0) > 0) {
+          triggerXpFloat(Number(result.xpDelta ?? 0), null)
+        }
       } catch (error) {
         console.error('Error updating XP:', error)
       }
@@ -527,18 +564,22 @@ export function TodoList(props: TodoListProps) {
   const handleToggle = useCallback(
     async (id: string, completed: boolean, event: React.MouseEvent) => {
       try {
-        if (completed) {
-          const todo = todos.find((t) => t.id === id)
-          const xp = todo?.xp_reward ?? 0
-          if (xp > 0) triggerXpFloat(xp, event)
-          fireTodoCompleteToast({ title: todo?.title ?? 'TO-DO', xp })
+        const result = await updateTodo(id, { completed }) as TodoMutationResponse
+        const xpDelta = Number(result.xpDelta ?? 0)
+        const action = result.xpAction ?? 'none'
+        const todoTitle = result.todo?.title ?? visibleTodos.find((t) => t.id === id)?.title ?? 'TO-DO'
+
+        if ((action === 'awarded' || action === 'retroactive') && xpDelta > 0) {
+          triggerXpFloat(xpDelta, event)
+          fireTodoCompleteToast({ title: todoTitle, xp: xpDelta })
+        } else if (action === 'reversed' && xpDelta !== 0) {
+          triggerXpDeduction(Math.abs(xpDelta), event)
         }
-        await updateTodo(id, { completed })
       } catch (error) {
         console.error('Error updating todo:', error)
       }
     },
-    [todos, updateTodo],
+    [visibleTodos, updateTodo],
   )
 
   const handleDelete = useCallback(
@@ -567,7 +608,6 @@ export function TodoList(props: TodoListProps) {
         </Box>
       )}
 
-      {/* Formulário de criação — admin (completo) */}
       {isAdmin ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
@@ -589,11 +629,7 @@ export function TodoList(props: TodoListProps) {
                   <InputAdornment position="end">
                     <Tooltip title={canSubmitNewTodo ? 'Adicionar' : 'Preencha prazo, XP e responsável'} arrow>
                       <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => void handleCreateTodo()}
-                          disabled={!canSubmitNewTodo}
-                        >
+                        <IconButton size="small" onClick={() => void handleCreateTodo()} disabled={!canSubmitNewTodo}>
                           <Plus size={24} />
                         </IconButton>
                       </span>
@@ -693,7 +729,6 @@ export function TodoList(props: TodoListProps) {
           </Box>
         </Box>
       ) : (
-        /* Formulário simplificado para usuário comum */
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
             <TextField
@@ -714,11 +749,7 @@ export function TodoList(props: TodoListProps) {
                   <InputAdornment position="end">
                     <Tooltip title={canSubmitNewTodo ? 'Adicionar' : 'Informe um título e prazo'} arrow>
                       <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => void handleCreateTodo()}
-                          disabled={!canSubmitNewTodo}
-                        >
+                        <IconButton size="small" onClick={() => void handleCreateTodo()} disabled={!canSubmitNewTodo}>
                           <Plus size={24} />
                         </IconButton>
                       </span>
@@ -753,7 +784,7 @@ export function TodoList(props: TodoListProps) {
         </Box>
       ) : visibleTodos.length === 0 ? (
         <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
-          {isAdmin ? 'Nenhum item na lista.' : 'Nenhum to-do atribuído a você neste item.'}
+          Nenhum item na lista.
         </Typography>
       ) : isAdmin ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -774,6 +805,8 @@ export function TodoList(props: TodoListProps) {
                   usersLoading={usersLoading}
                   isHighlighted={highlightedTodoId === todo.id}
                   canManage={true}
+                  canToggle={true}
+                  currentUserId={currentUser?.id ?? null}
                 />
               ))}
             </Box>
@@ -796,6 +829,8 @@ export function TodoList(props: TodoListProps) {
               usersLoading={usersLoading}
               isHighlighted={highlightedTodoId === todo.id}
               canManage={false}
+              canToggle={Boolean(todo.assigned_to && todo.assigned_to === currentUser?.id)}
+              currentUserId={currentUser?.id ?? null}
             />
           ))}
         </Box>

@@ -56,6 +56,12 @@ export interface ProjectTodo {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  xp_reward?: number | null;
+  deadline_bonus_percent?: number | null;
+  deadline?: string | null;
+  achievement_id?: string | null;
+  completed_at?: string | null;
+  assigned_at?: string | null;
 }
 
 export interface Activity {

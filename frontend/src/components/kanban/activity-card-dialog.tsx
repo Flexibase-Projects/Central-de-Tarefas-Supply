@@ -38,6 +38,7 @@ interface ActivityCardDialogProps {
   onOpenChange: (open: boolean) => void
   onUpdate: (activity: Activity) => Promise<void>
   onDelete?: (activityId: string) => Promise<void>
+  highlightedTodoId?: string | null
 }
 
 const statusOptions: { value: Activity['status']; label: string }[] = [
@@ -76,6 +77,7 @@ export function ActivityCardDialog({
   onOpenChange,
   onUpdate,
   onDelete,
+  highlightedTodoId,
 }: ActivityCardDialogProps) {
   const { achievements } = useAchievements()
   const linkedAchievements = achievements.filter(
@@ -306,7 +308,12 @@ export function ActivityCardDialog({
                       <CheckSquare size={18} /> TO-DO
                     </Typography>
                     <Paper variant="outlined" sx={(t) => ({ ...sectionPaperSx(t) })}>
-                      <TodoList activityId={activity.id} sharedTodos={activityTodosApi} contextName={activity.name} />
+                      <TodoList
+                        activityId={activity.id}
+                        sharedTodos={activityTodosApi}
+                        contextName={activity.name}
+                        highlightedTodoId={highlightedTodoId}
+                      />
                     </Paper>
                   </Box>
 

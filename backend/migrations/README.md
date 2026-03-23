@@ -14,6 +14,8 @@ Execute no **Supabase SQL Editor** (ou via psql) na **ordem abaixo**. As migraç
 
 6. **006_activity_todos_and_comments.sql** – To-dos vinculados só à atividade (`cdt_project_todos.activity_id`, `project_id` opcional) e comentários por atividade (`cdt_comments.activity_id`). Exige exatamente um “pai”: projeto **ou** atividade (to-dos); projeto, task **ou** atividade (comentários).
 
+7. **007_todo_assignment_and_xp_queue.sql** – Adiciona `assigned_at` em `cdt_project_todos`, cria índice para feed de to-dos atribuídos recentemente e ajusta os índices do XP log para permitir múltiplos ciclos de `todo_completed`/`todo_uncompleted`.
+
 Se aparecer erro **"column cdt_activities.xp_reward does not exist"** (ou equivalente em `cdt_project_todos`):
 
 - **Opção A (recomendado):** execute **001** e depois **002** (gamificação completa, achievements, seeds).
