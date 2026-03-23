@@ -238,9 +238,6 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-            <Typography variant="caption" sx={{ color: focusTone, fontWeight: 700, fontSize: 11 }}>
-              {isAdmin ? 'Admin define XP.' : 'Sua demanda tem prioridade visual.'}
-            </Typography>
             {activeCount > 0 && (
               <Box
                 sx={{

@@ -354,20 +354,6 @@ const TodoItem = memo(function TodoItem({
                 '& .MuiChip-label': { px: 0.75 },
               }}
             />
-          ) : mine ? (
-            <Chip
-              size="small"
-              label="XP pendente"
-              sx={{
-                height: 18,
-                fontSize: 10,
-                fontWeight: 700,
-                bgcolor: 'rgba(245,158,11,0.08)',
-                color: '#B45309',
-                border: '1px solid rgba(245,158,11,0.18)',
-                '& .MuiChip-label': { px: 0.75 },
-              }}
-            />
           ) : null}
 
           {deadlineChip}
@@ -769,8 +755,8 @@ export function TodoList(props: TodoListProps) {
               sx={{ width: 158, flexShrink: 0 }}
             />
           </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: -0.5 }}>
-            O to-do será atribuído a você. Um administrador definirá o XP.
+          <Typography variant="caption" color="warning.main" sx={{ mt: -0.5, fontWeight: 600 }}>
+            Sem Experiência definida.
           </Typography>
         </Box>
       )}
