@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo, useMemo } from 'react'
+import { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react'
 import * as React from 'react'
 import {
   Box,
@@ -17,8 +17,11 @@ import {
   Tooltip,
   Autocomplete,
   ClickAwayListener,
+  FormControlLabel,
+  Switch,
+  Collapse,
 } from '@mui/material'
-import { Trash2, GripVertical, Plus, Pencil } from '@/components/ui/icons'
+import { Trash2, GripVertical, Plus, Pencil, Settings } from '@/components/ui/icons'
 import type { ProjectTodo, User } from '@/types'
 import { useTodos, type TodosScope, type SharedProjectTodosApi } from '@/hooks/use-todos'
 import { usePermissions } from '@/hooks/use-permissions'
@@ -101,6 +104,19 @@ function isXpPending(todo: TodoEntity): boolean {
   return Number(todo.xp_reward ?? 0) <= 0
 }
 
+const TODO_ADMIN_SETTINGS_STORAGE_KEY = 'central-tarefas:todo-admin-settings-open'
+
+function readTodoAdminSettingsOpen(): boolean {
+  if (typeof window === 'undefined') return true
+  try {
+    const raw = window.localStorage.getItem(TODO_ADMIN_SETTINGS_STORAGE_KEY)
+    if (raw === null) return true
+    return raw === '1' || raw === 'true'
+  } catch {
+    return true
+  }
+}
+
 type TodoListProps = (
   | { projectId: string; activityId?: never; contextName?: string }
   | { activityId: string; projectId?: never; contextName?: string }
@@ -121,6 +137,8 @@ interface TodoItemProps {
   canManage: boolean
   canToggle: boolean
   currentUserId: string | null
+  /** Admin: sem alça de arrastar (ex.: lista filtrada sem concluídos) */
+  dragDisabled?: boolean
 }
 
 const TodoItem = memo(function TodoItem({
@@ -135,6 +153,7 @@ const TodoItem = memo(function TodoItem({
   canManage,
   canToggle,
   currentUserId,
+  dragDisabled = false,
 }: TodoItemProps) {
   const {
     attributes,
@@ -143,7 +162,7 @@ const TodoItem = memo(function TodoItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: todo.id, disabled: !canManage })
+  } = useSortable({ id: todo.id, disabled: !canManage || dragDisabled })
 
   const itemRef = React.useRef<HTMLDivElement>(null)
   const [shouldHighlight, setShouldHighlight] = React.useState(false)
@@ -265,7 +284,7 @@ const TodoItem = memo(function TodoItem({
         ...emphasisSx,
       }}
     >
-      {canManage && (
+      {canManage && !dragDisabled && (
         <Box {...attributes} {...listeners} sx={{ cursor: 'grab', color: 'text.secondary', '&:active': { cursor: 'grabbing' } }}>
           <GripVertical size={18} />
         </Box>
@@ -515,11 +534,27 @@ export function TodoList(props: TodoListProps) {
   }, [visibleTodos, isAdmin])
 
   const [newTodoTitle, setNewTodoTitle] = useState('')
+  const newTodoTitleInputRef = useRef<HTMLInputElement | null>(null)
   const [newTodoXp, setNewTodoXp] = useState(1)
   const [newTodoDeadline, setNewTodoDeadline] = useState('')
   const [newTodoDeadlineBonusPercent, setNewTodoDeadlineBonusPercent] = useState(0)
   const [newTodoAchievementId, setNewTodoAchievementId] = useState<string | null>(null)
   const [newTodoAssignee, setNewTodoAssignee] = useState<User | null>(null)
+  /** Com +5 to-dos, ligado por padrão; com ≤5 a opção some e a lista mostra tudo */
+  const [hideCompleted, setHideCompleted] = useState(true)
+  const [adminTodoSettingsOpen, setAdminTodoSettingsOpen] = useState(() => readTodoAdminSettingsOpen())
+
+  const toggleAdminTodoSettings = useCallback(() => {
+    setAdminTodoSettingsOpen((prev) => {
+      const next = !prev
+      try {
+        window.localStorage.setItem(TODO_ADMIN_SETTINGS_STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }, [])
 
   const linkedAchievements = achievements.filter((a) => (a.mode ?? 'global_auto') === 'linked_item')
 
@@ -537,7 +572,14 @@ export function TodoList(props: TodoListProps) {
   const completedCount = visibleTodos.filter((t) => t.completed).length
   const totalCount = visibleTodos.length
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
-  const shouldScrollTodos = totalCount > 5
+  const effectiveHideCompleted = totalCount > 5 && hideCompleted
+  const todosForList = useMemo(() => {
+    const base = isAdmin ? visibleTodos : orderedVisibleTodos
+    if (!effectiveHideCompleted) return base
+    return base.filter((t) => !t.completed || (highlightedTodoId != null && t.id === highlightedTodoId))
+  }, [isAdmin, visibleTodos, orderedVisibleTodos, effectiveHideCompleted, highlightedTodoId])
+  const adminDragEnabled = isAdmin && !effectiveHideCompleted
+  const shouldScrollTodos = todosForList.length > 5
   const todoListContainerSx = {
     display: 'flex',
     flexDirection: 'column',
@@ -566,7 +608,7 @@ export function TodoList(props: TodoListProps) {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
-    if (over && active.id !== over.id) {
+    if (over && active.id !== over.id && adminDragEnabled) {
       const oldIndex = visibleTodos.findIndex((t) => t.id === active.id)
       const newIndex = visibleTodos.findIndex((t) => t.id === over.id)
       const newTodos = arrayMove(visibleTodos, oldIndex, newIndex)
@@ -612,11 +654,7 @@ export function TodoList(props: TodoListProps) {
       })
 
       setNewTodoTitle('')
-      setNewTodoXp(1)
-      setNewTodoDeadline('')
-      setNewTodoDeadlineBonusPercent(0)
-      setNewTodoAchievementId(null)
-      setNewTodoAssignee(null)
+      queueMicrotask(() => newTodoTitleInputRef.current?.focus())
     } catch (error) {
       console.error('Error creating todo:', error)
     }
@@ -704,15 +742,41 @@ export function TodoList(props: TodoListProps) {
           <Typography variant="caption" color="text.secondary" display="block" textAlign="center" sx={{ mt: 0.5 }}>
             {completedCount} de {totalCount} concluídos
           </Typography>
+          {totalCount > 5 && (
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={hideCompleted}
+                  onChange={(_, v) => setHideCompleted(v)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography component="span" variant="caption" fontWeight={600} sx={{ fontSize: 12 }}>
+                  Ocultar to-dos concluídos
+                </Typography>
+              }
+              sx={{
+                mt: 0.75,
+                mx: 0,
+                mb: 0,
+                alignItems: 'center',
+                '& .MuiFormControlLabel-label': { ml: 0.5 },
+              }}
+            />
+          )}
         </Box>
       )}
 
       {isAdmin ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
             <TextField
               size="small"
               fullWidth
+              margin="none"
+              inputRef={newTodoTitleInputRef}
               value={newTodoTitle}
               onChange={(e) => setNewTodoTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -724,9 +788,57 @@ export function TodoList(props: TodoListProps) {
               placeholder="Título do to-do…"
               label="Título"
               InputProps={{
+                startAdornment: (
+                  <InputAdornment
+                    position="start"
+                    sx={{
+                      ml: -0.5,
+                      mr: 0.25,
+                      alignSelf: 'stretch',
+                      maxHeight: 'none',
+                      '& .MuiIconButton-root': { alignSelf: 'center' },
+                    }}
+                  >
+                    <Tooltip
+                      title={
+                        adminTodoSettingsOpen
+                          ? 'Ocultar configurações (XP, prazo, responsável…)'
+                          : 'Mostrar configurações do to-do'
+                      }
+                      arrow
+                    >
+                      <IconButton
+                        size="small"
+                        edge="start"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleAdminTodoSettings()
+                        }}
+                        aria-expanded={adminTodoSettingsOpen}
+                        aria-label={
+                          adminTodoSettingsOpen
+                            ? 'Ocultar configurações do to-do'
+                            : 'Mostrar configurações do to-do'
+                        }
+                        sx={(theme) => ({
+                          p: 0.5,
+                          opacity: adminTodoSettingsOpen ? 1 : 0.22,
+                          transition: theme.transitions.create('opacity', {
+                            duration: theme.transitions.duration.shorter,
+                          }),
+                          '&:hover': { opacity: 1 },
+                          '&:focus-visible': { opacity: 1 },
+                        })}
+                      >
+                        <Settings size={18} />
+                      </IconButton>
+                    </Tooltip>
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <Tooltip title={canSubmitNewTodo ? 'Adicionar' : 'Preencha prazo, XP e responsável'} arrow>
+                    <Tooltip title={canSubmitNewTodo ? 'Adicionar (Enter)' : 'Preencha prazo, XP e responsável'} arrow>
                       <span>
                         <IconButton size="small" onClick={() => void handleCreateTodo()} disabled={!canSubmitNewTodo}>
                           <Plus size={24} />
@@ -739,56 +851,120 @@ export function TodoList(props: TodoListProps) {
             />
           </Box>
 
-          <Box
+          <Collapse
+            in={adminTodoSettingsOpen}
+            timeout="auto"
+            unmountOnExit={false}
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1.25,
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: 'action.hover',
-              border: '1px solid',
-              borderColor: 'divider',
+              overflow: 'visible',
+              // Collapse usa overflow:hidden nos wrappers e recorta legendas do OutlinedInput
+              '& .MuiCollapse-wrapper': { overflow: 'visible' },
+              '& .MuiCollapse-wrapperInner': { overflow: 'visible' },
             }}
           >
-            <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ letterSpacing: 0.4 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.75,
+                p: 1,
+                mt: 0.25,
+                borderRadius: 1,
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                overflow: 'visible',
+              }}
+            >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={700}
+              sx={{ letterSpacing: 0.2, lineHeight: 1.2, fontSize: 11 }}
+            >
               Configurações do to-do (obrigatórias para lançar)
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                gap: 1.25,
+                rowGap: 1,
+                width: '100%',
+                minWidth: 0,
+                // Não usar overflow-x:auto aqui: no CSS isso força overflow-y a não ser visible e corta os rótulos outlined
+                overflow: 'visible',
+              }}
+            >
               <TextField
                 label="XP base"
                 type="number"
                 size="small"
+                margin="none"
                 required
                 value={newTodoXp}
                 onChange={(e) => setNewTodoXp(Math.max(0.01, Math.min(500, Number(e.target.value))))}
                 inputProps={{ min: 0.01, max: 500, step: 0.01 }}
-                sx={{ width: 110 }}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  flex: '0 0 auto',
+                  width: 88,
+                  minWidth: 88,
+                  '& .MuiInputBase-root': { fontSize: '0.8125rem' },
+                  '& .MuiInputBase-input': { py: 0.65, px: 0.75 },
+                }}
               />
               <TextField
                 label="Prazo"
                 type="date"
                 size="small"
+                margin="none"
                 required
                 value={newTodoDeadline}
                 onChange={(e) => setNewTodoDeadline(e.target.value)}
                 InputLabelProps={{ shrink: true }}
-                sx={{ width: 158 }}
+                sx={{
+                  flex: '0 0 auto',
+                  width: 148,
+                  minWidth: 148,
+                  '& .MuiInputBase-root': { fontSize: '0.8125rem' },
+                  '& .MuiInputBase-input': { py: 0.65, px: 0.75 },
+                }}
               />
               <TextField
-                label="% bônus prazo"
+                label="% bônus"
+                title="% bônus por prazo"
                 type="number"
                 size="small"
+                margin="none"
                 value={newTodoDeadlineBonusPercent}
                 onChange={(e) => setNewTodoDeadlineBonusPercent(Math.max(0, Math.min(500, Number(e.target.value))))}
                 inputProps={{ min: 0, max: 500, step: 0.01 }}
-                sx={{ width: 130 }}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  flex: '0 0 auto',
+                  width: 88,
+                  minWidth: 88,
+                  '& .MuiInputBase-root': { fontSize: '0.8125rem' },
+                  '& .MuiInputBase-input': { py: 0.65, px: 0.5, textAlign: 'center' },
+                }}
               />
-              <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
-                <InputLabel id="new-todo-achievement-label">Conquista (opcional)</InputLabel>
+              <FormControl
+                size="small"
+                margin="none"
+                sx={{
+                  flex: '1 1 118px',
+                  minWidth: 96,
+                  maxWidth: '100%',
+                  '& .MuiInputBase-root': { fontSize: '0.8125rem' },
+                }}
+              >
+                <InputLabel id="new-todo-achievement-label">Conquista (opc.)</InputLabel>
                 <Select
                   labelId="new-todo-achievement-label"
-                  label="Conquista (opcional)"
+                  label="Conquista (opc.)"
                   value={newTodoAchievementId ?? ''}
                   onChange={(e) => setNewTodoAchievementId(e.target.value || null)}
                 >
@@ -809,7 +985,7 @@ export function TodoList(props: TodoListProps) {
               getOptionLabel={(u) => u.name || u.email}
               isOptionEqualToValue={(a, b) => a.id === b.id}
               renderInput={(params) => (
-                <TextField {...params} label="Responsável" required placeholder="Busque por nome…" />
+                <TextField {...params} margin="none" label="Responsável" required placeholder="Busque por nome…" />
               )}
               slotProps={{
                 popper: {
@@ -820,12 +996,15 @@ export function TodoList(props: TodoListProps) {
               }}
               noOptionsText={usersLoading ? 'Carregando usuários…' : 'Nenhum usuário'}
             />
-            {!canSubmitNewTodo && newTodoTitle.trim() && (
-              <Typography variant="caption" color="warning.main">
-                Informe prazo, XP válido e um responsável para adicionar o to-do.
-              </Typography>
-            )}
-          </Box>
+            </Box>
+          </Collapse>
+          {!canSubmitNewTodo && newTodoTitle.trim() && (
+            <Typography variant="caption" color="warning.main" sx={{ lineHeight: 1.25 }}>
+              {adminTodoSettingsOpen
+                ? 'Informe prazo, XP válido e um responsável para adicionar o to-do.'
+                : 'Abra a engrenagem e informe prazo, XP e responsável para adicionar o to-do.'}
+            </Typography>
+          )}
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -833,6 +1012,7 @@ export function TodoList(props: TodoListProps) {
             <TextField
               size="small"
               fullWidth
+              inputRef={newTodoTitleInputRef}
               value={newTodoTitle}
               onChange={(e) => setNewTodoTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -846,7 +1026,7 @@ export function TodoList(props: TodoListProps) {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <Tooltip title={canSubmitNewTodo ? 'Adicionar' : 'Informe um título e prazo'} arrow>
+                    <Tooltip title={canSubmitNewTodo ? 'Adicionar (Enter)' : 'Informe um título e prazo'} arrow>
                       <span>
                         <IconButton size="small" onClick={() => void handleCreateTodo()} disabled={!canSubmitNewTodo}>
                           <Plus size={24} />
@@ -885,14 +1065,18 @@ export function TodoList(props: TodoListProps) {
         <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
           Nenhum item na lista.
         </Typography>
+      ) : todosForList.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
+          Todos os to-dos estão concluídos. Desative &quot;Ocultar to-dos concluídos&quot; para vê-los na lista.
+        </Typography>
       ) : isAdmin ? (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={visibleTodos.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={todosForList.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             <Box sx={todoListContainerSx}>
               {loading && (
                 <LinearProgress sx={{ mb: 0.5, borderRadius: 1 }} color="primary" variant="indeterminate" />
               )}
-              {visibleTodos.map((todo) => (
+              {todosForList.map((todo) => (
                 <TodoItem
                   key={todo.id}
                   todo={todo}
@@ -906,6 +1090,7 @@ export function TodoList(props: TodoListProps) {
                   canManage={true}
                   canToggle={true}
                   currentUserId={currentUser?.id ?? null}
+                  dragDisabled={!adminDragEnabled}
                 />
               ))}
             </Box>
@@ -916,7 +1101,7 @@ export function TodoList(props: TodoListProps) {
           {loading && (
             <LinearProgress sx={{ mb: 0.5, borderRadius: 1 }} color="primary" variant="indeterminate" />
           )}
-          {orderedVisibleTodos.map((todo) => (
+          {todosForList.map((todo) => (
             <TodoItem
               key={todo.id}
               todo={todo}

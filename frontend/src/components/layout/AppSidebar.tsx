@@ -6,15 +6,11 @@ import {
   Code,
   CheckSquare,
   Settings,
-  Trophy,
-  HelpCircle,
   ChevronLeft,
   Menu,
   BarChart2,
   Paintbrush,
   Flag,
-  Person,
-  TrendingUp,
   OrgChartIcon,
   DollarSign,
 } from '@/components/ui/icons'
@@ -33,10 +29,10 @@ import {
 import { Sun, Moon } from 'lucide-react'
 import { useThemeMode } from '@/theme/ThemeProvider'
 import { usePermissions } from '@/hooks/use-permissions'
-import { useUserProgress } from '@/hooks/use-user-progress'
 import { LevelXpBar } from '@/components/master-mode/LevelXpBar'
 import { getTierForLevel } from '@/utils/tier'
-import { useMyPendingTodosCount } from '@/hooks/use-my-pending-todos'
+import { LEVEL_CARD_MENU_ITEMS } from '@/components/layout/sidebar-level-nav'
+import type { UserProgress } from '@/types'
 
 type NavItem = { title: string; url: string; icon: React.ElementType; permission: string | null; requireRole?: string }
 
@@ -66,21 +62,128 @@ const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
   },
 ]
 
-const LEVEL_CARD_MENU_ITEMS: { title: string; url: string; icon: React.ElementType; iconStyle?: React.CSSProperties }[] = [
-  { title: 'Ver Meu Nível', url: '/perfil', icon: Person },
-  { title: 'Conquistas', url: '/conquistas', icon: Trophy, iconStyle: { color: '#F59E0B' } },
-  { title: 'Progressão', url: '/niveis', icon: TrendingUp },
-  { title: 'Como Funciona?', url: '/tutorial', icon: HelpCircle },
-]
-
 interface AppSidebarProps {
   isCollapsed?: boolean
   onCollapsedChange?: (collapsed: boolean) => void
+  pendingTodosCount: number | null
+  progressData: UserProgress | null
+  progressLoading: boolean
 }
 
-function DemandCard({ count, compact = false }: { count: number | null; compact?: boolean }) {
+export function DemandCard({
+  count,
+  compact = false,
+  headerInline = false,
+}: {
+  count: number | null
+  compact?: boolean
+  /** Uma linha, altura contida — para header com sidebar retraída */
+  headerInline?: boolean
+}) {
   const resolvedCount = count ?? 0
   const hasPending = resolvedCount > 0
+
+  if (headerInline) {
+    const labelShort = hasPending ? 'em aberto' : 'concluídas'
+    return (
+      <Tooltip
+        title={
+          <>
+            {resolvedCount.toString().padStart(2, '0')}{' '}
+            {hasPending ? 'entregas em aberto' : 'entregas concluídas'} — Abrir indicadores
+          </>
+        }
+        placement="bottom"
+      >
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 1.5,
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: hasPending ? 'rgba(245,158,11,0.35)' : 'rgba(59,130,246,0.18)',
+            background: hasPending
+              ? 'linear-gradient(135deg, rgba(245,158,11,0.14) 0%, rgba(217,119,6,0.06) 100%)'
+              : 'linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(14,165,233,0.05) 100%)',
+            boxShadow: 'none',
+            flexShrink: 0,
+            maxHeight: 44,
+          }}
+        >
+          <Box
+            component={Link}
+            to="/indicadores"
+            sx={{
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1,
+              py: 0.35,
+              color: 'text.primary',
+              minHeight: 0,
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 800,
+                letterSpacing: 0.6,
+                textTransform: 'uppercase',
+                color: hasPending ? 'warning.dark' : 'primary.main',
+                fontSize: 7,
+                lineHeight: 1.15,
+                maxWidth: 56,
+              }}
+            >
+              Minhas demandas
+            </Typography>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 0.65,
+                py: 0.2,
+                borderRadius: 1,
+                bgcolor: hasPending ? '#D97706' : 'rgba(37,99,235,0.75)',
+                border: '1px solid',
+                borderColor: 'rgba(255,255,255,0.25)',
+                flexShrink: 0,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 13,
+                  lineHeight: 1,
+                  letterSpacing: -0.02,
+                  color: '#fff',
+                }}
+              >
+                {resolvedCount.toString().padStart(2, '0')}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  fontSize: 9,
+                  lineHeight: 1,
+                  color: 'rgba(255,255,255,0.92)',
+                  display: { xs: 'none', sm: 'block' },
+                  maxWidth: 52,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {labelShort}
+              </Typography>
+            </Box>
+          </Box>
+        </Paper>
+      </Tooltip>
+    )
+  }
 
   return (
     <Paper
@@ -186,18 +289,22 @@ function DemandCard({ count, compact = false }: { count: number | null; compact?
   )
 }
 
-export function AppSidebar(props: AppSidebarProps = {}) {
-  const { isCollapsed: controlledCollapsed, onCollapsedChange } = props
+export function AppSidebar(props: AppSidebarProps) {
+  const {
+    isCollapsed: controlledCollapsed,
+    onCollapsedChange,
+    pendingTodosCount,
+    progressData,
+    progressLoading,
+  } = props
   const location = useLocation()
   const navigate = useNavigate()
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
   const { mode, toggleTheme } = useThemeMode()
   const { hasPermission, hasRole } = usePermissions()
-  const { data: progressData, loading: progressLoading } = useUserProgress()
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [levelMenuAnchor, setLevelMenuAnchor] = useState<HTMLElement | null>(null)
-  const { count: pendingTodosCount } = useMyPendingTodosCount()
   const isCollapsed = controlledCollapsed ?? internalCollapsed
 
   const setIsCollapsed = (v: boolean) => {
@@ -454,52 +561,52 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           </Box>
         </Tooltip>
 
-        <Tooltip title={isCollapsed ? 'Nível e mais opções' : undefined} placement="right">
-          <Box
-            component="button"
-            type="button"
-            onClick={(e) => setLevelMenuAnchor(e.currentTarget)}
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 1,
-              width: '100%',
-              px: isCollapsed ? 0 : 1,
-              py: 0.75,
-              borderRadius: 1.5,
-              border: `1px solid ${borderColor}`,
-              cursor: 'pointer',
-              bgcolor: 'transparent',
-              color: 'inherit',
-              textAlign: 'left',
-              transition: 'border-color 0.15s, background-color 0.15s',
-              '&:hover': {
-                borderColor: theme.palette.secondary.main,
-                bgcolor: isLight ? 'rgba(124,58,237,0.05)' : 'rgba(167,139,250,0.08)',
-              },
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-              mb: 0.5,
-            }}
-          >
+        {!isCollapsed && (
+          <>
             <Box
-              component="span"
+              component="button"
+              type="button"
+              onClick={(e) => setLevelMenuAnchor(e.currentTarget)}
               sx={{
-                width: 26,
-                height: 26,
-                borderRadius: 1,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                bgcolor: isLight ? 'rgba(124,58,237,0.1)' : 'rgba(167,139,250,0.15)',
-                color: 'secondary.main',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                width: '100%',
+                px: 1,
+                py: 0.75,
+                borderRadius: 1.5,
+                border: `1px solid ${borderColor}`,
+                cursor: 'pointer',
+                bgcolor: 'transparent',
+                color: 'inherit',
+                textAlign: 'left',
+                transition: 'border-color 0.15s, background-color 0.15s',
+                '&:hover': {
+                  borderColor: theme.palette.secondary.main,
+                  bgcolor: isLight ? 'rgba(124,58,237,0.05)' : 'rgba(167,139,250,0.08)',
+                },
+                justifyContent: 'flex-start',
+                mb: 0.5,
               }}
             >
-              <span style={{ display: 'inline-flex' }}>
-                <BarChart2 size={14} />
-              </span>
-            </Box>
-            {!isCollapsed && (
+              <Box
+                component="span"
+                sx={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  bgcolor: isLight ? 'rgba(124,58,237,0.1)' : 'rgba(167,139,250,0.15)',
+                  color: 'secondary.main',
+                }}
+              >
+                <span style={{ display: 'inline-flex' }}>
+                  <BarChart2 size={14} />
+                </span>
+              </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <LevelXpBar progress={progressData} loading={progressLoading} compact />
                 {progressData?.level != null &&
@@ -515,54 +622,54 @@ export function AppSidebar(props: AppSidebarProps = {}) {
                     )
                   })()}
               </Box>
-            )}
-          </Box>
-        </Tooltip>
+            </Box>
 
-        <MuiMenu
-          anchorEl={levelMenuAnchor}
-          open={Boolean(levelMenuAnchor)}
-          onClose={() => setLevelMenuAnchor(null)}
-          anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'center', horizontal: 'left' }}
-          slotProps={{
-            paper: {
-              sx: {
-                minWidth: 200,
-                mt: 0,
-                ml: 0.5,
-                borderRadius: 2,
-                boxShadow: theme.shadows[8],
-              },
-            },
-          }}
-        >
-          {LEVEL_CARD_MENU_ITEMS.map((item) => {
-            const Icon = item.icon
-            const active = location.pathname === item.url
-            return (
-              <MenuItem
-                key={item.url}
-                onClick={() => {
-                  setLevelMenuAnchor(null)
-                  navigate(item.url)
-                }}
-                sx={{
-                  gap: 1.5,
-                  py: 1.25,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: active ? activeColor : 'text.primary',
-                }}
-              >
-                <span style={{ display: 'inline-flex', flexShrink: 0 }}>
-                  <Icon size={18} style={{ flexShrink: 0, ...item.iconStyle }} />
-                </span>
-                {item.title}
-              </MenuItem>
-            )
-          })}
-        </MuiMenu>
+            <MuiMenu
+              anchorEl={levelMenuAnchor}
+              open={Boolean(levelMenuAnchor)}
+              onClose={() => setLevelMenuAnchor(null)}
+              anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'center', horizontal: 'left' }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    minWidth: 200,
+                    mt: 0,
+                    ml: 0.5,
+                    borderRadius: 2,
+                    boxShadow: theme.shadows[8],
+                  },
+                },
+              }}
+            >
+              {LEVEL_CARD_MENU_ITEMS.map((item) => {
+                const Icon = item.icon
+                const active = location.pathname === item.url
+                return (
+                  <MenuItem
+                    key={item.url}
+                    onClick={() => {
+                      setLevelMenuAnchor(null)
+                      navigate(item.url)
+                    }}
+                    sx={{
+                      gap: 1.5,
+                      py: 1.25,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: active ? activeColor : 'text.primary',
+                    }}
+                  >
+                    <span style={{ display: 'inline-flex', flexShrink: 0 }}>
+                      <Icon size={18} style={{ flexShrink: 0, ...item.iconStyle }} />
+                    </span>
+                    {item.title}
+                  </MenuItem>
+                )
+              })}
+            </MuiMenu>
+          </>
+        )}
 
       </Box>
     </Box>

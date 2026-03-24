@@ -30,6 +30,9 @@ import { useRoles } from '@/hooks/use-roles'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+/** Desative quando criação/vínculo via painel estiver estável de novo (evita 503 no Admin API). */
+const ADMIN_NEW_USER_FLOW_ENABLED = false
+
 type AuthListUser = {
   id: string
   email: string
@@ -98,12 +101,14 @@ export function UsersTable() {
   }, [authList, authSearch])
 
   const handleOpenNewUser = () => {
+    if (!ADMIN_NEW_USER_FLOW_ENABLED) return
     setAuthSearch('')
     setIsNewUserDialogOpen(true)
     fetchAuthList()
   }
 
   const handleCreate = () => {
+    if (!ADMIN_NEW_USER_FLOW_ENABLED) return
     setEditingUser(null)
     setFormData({ email: '', name: '', avatar_url: '' })
     setNewUserRoleId(getPreferredRoleId(roleItems))
@@ -121,6 +126,10 @@ export function UsersTable() {
   }
 
   const handleSubmitUser = async () => {
+    if (!editingUser && !ADMIN_NEW_USER_FLOW_ENABLED) {
+      alert('Criação de usuário pelo painel está temporariamente indisponível.')
+      return
+    }
     setSavingUser(true)
     try {
       if (editingUser) {
@@ -205,9 +214,25 @@ export function UsersTable() {
         <Typography variant="h6" fontWeight={600}>
           Usuarios com acesso
         </Typography>
-        <Button variant="contained" size="small" onClick={handleOpenNewUser} startIcon={<Plus size={20} />}>
-          Novo Usuario
-        </Button>
+        <Tooltip
+          title={
+            ADMIN_NEW_USER_FLOW_ENABLED
+              ? 'Abrir cadastro de novos usuários'
+              : 'Criação de novos usuários pelo painel está temporariamente indisponível (serviço indisponível ou instável).'
+          }
+        >
+          <span>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleOpenNewUser}
+              startIcon={<Plus size={20} />}
+              disabled={!ADMIN_NEW_USER_FLOW_ENABLED}
+            >
+              Novo Usuario
+            </Button>
+          </span>
+        </Tooltip>
       </Box>
 
       <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
@@ -393,14 +418,25 @@ export function UsersTable() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => {
-              setIsNewUserDialogOpen(false)
-              handleCreate()
-            }}
+          <Tooltip
+            title={
+              ADMIN_NEW_USER_FLOW_ENABLED
+                ? 'Criar conta no Auth e no sistema com senha inicial'
+                : 'Temporariamente indisponível.'
+            }
           >
-            Criar usuario manualmente
-          </Button>
+            <span>
+              <Button
+                onClick={() => {
+                  setIsNewUserDialogOpen(false)
+                  handleCreate()
+                }}
+                disabled={!ADMIN_NEW_USER_FLOW_ENABLED}
+              >
+                Criar usuario manualmente
+              </Button>
+            </span>
+          </Tooltip>
           <Box sx={{ flex: 1 }} />
           <Button onClick={() => setIsNewUserDialogOpen(false)}>Fechar</Button>
         </DialogActions>

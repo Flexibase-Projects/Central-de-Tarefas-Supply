@@ -70,9 +70,6 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
   const totalOpenCount = Math.max(0, Number(summary?.totalOpenCount ?? 0))
   const xpPendingCount = Math.max(0, Number(summary?.xpPendingCount ?? 0))
   const activeCount = Math.max(assignedCount, isAdmin ? xpPendingCount : 0)
-  const focusTone = activeCount > 0
-    ? (isAdmin && xpPendingCount > 0 ? '#F59E0B' : '#2563EB')
-    : '#64748B'
   const focusBg = isAdmin && xpPendingCount > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(37,99,235,0.08)'
   const focusBorder = isAdmin && xpPendingCount > 0 ? 'rgba(245,158,11,0.22)' : 'rgba(37,99,235,0.22)'
   const style = { transform: CSS.Transform.toString(transform), transition }

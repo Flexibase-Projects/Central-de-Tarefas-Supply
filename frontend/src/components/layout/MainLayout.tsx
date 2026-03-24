@@ -4,9 +4,12 @@ import { AppSidebar } from './AppSidebar'
 import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown'
 import { ViewAsUserButton } from './ViewAsUserButton'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUserProgress } from '@/hooks/use-user-progress'
+import { useMyPendingTodosCount } from '@/hooks/use-my-pending-todos'
 import { TodoCompleteToast } from '@/components/achievements/TodoCompleteToast'
 import { UserLevelProfileDrawer } from './UserLevelProfileDrawer'
 import { HeaderProfileButton } from './HeaderProfileButton'
+import { HeaderCollapsedSidebarTools } from './HeaderCollapsedSidebarTools'
 
 const HEADER_HEIGHT = 59
 
@@ -20,10 +23,18 @@ function MainLayoutContent({ children }: MainLayoutProps) {
   const sidebarWidth = sidebarCollapsed ? 72 : 256
   const theme = useTheme()
   const { isViewingAs, viewAsUser, stopViewingAs, currentUser } = useAuth()
+  const { data: progressData, loading: progressLoading } = useUserProgress()
+  const { count: pendingTodosCount } = useMyPendingTodosCount()
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppSidebar isCollapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
+      <AppSidebar
+        isCollapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+        pendingTodosCount={pendingTodosCount}
+        progressData={progressData}
+        progressLoading={progressLoading}
+      />
       <Box
         component="main"
         sx={{
@@ -52,16 +63,36 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           sx={{
             height: HEADER_HEIGHT,
             minHeight: HEADER_HEIGHT,
+            maxHeight: HEADER_HEIGHT,
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 1.5,
             px: 2,
             borderBottom: `1px solid ${theme.palette.divider}`,
             bgcolor: 'background.default',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              minWidth: 0,
+              flex: '0 1 auto',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              height: '100%',
+            }}
+          >
+            {sidebarCollapsed ? (
+              <HeaderCollapsedSidebarTools
+                pendingTodosCount={pendingTodosCount}
+                progressData={progressData}
+                progressLoading={progressLoading}
+              />
+            ) : null}
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, ml: 'auto' }}>
             <ViewAsUserButton />
             <NotificationsDropdown />
             {currentUser && (
