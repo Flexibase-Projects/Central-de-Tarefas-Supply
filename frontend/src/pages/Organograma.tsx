@@ -61,7 +61,7 @@ export default function Organograma() {
   const { getAuthHeaders } = useAuth()
   const { tree, loading, error, fetchTree } = useOrgTree()
   const { summary, loading: sumLoading, fetchSummary, setSummary } = useOrgSummary()
-  const { entries, fetchEntries, createEntry, deleteEntry, updateEntry } = useOrgEntries()
+  const { entries, fetchEntries, createEntry, deleteEntry, deleteSubtree, updateEntry } = useOrgEntries()
   const { graph, fetchGraph } = useCostGraph()
 
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
@@ -85,6 +85,10 @@ export default function Organograma() {
   const [editCost, setEditCost] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
   const [editSaving, setEditSaving] = useState(false)
+  const [deletePreviewOpen, setDeletePreviewOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTree()
@@ -126,6 +130,9 @@ export default function Organograma() {
     setHighlightedIds(new Set())
     setEditOpen(false)
     setEditError(null)
+    setDeletePreviewOpen(false)
+    setDeleteConfirmOpen(false)
+    setDeleteError(null)
   }, [setSummary])
 
   const selectedNode = useMemo(
@@ -137,6 +144,7 @@ export default function Organograma() {
     () => (selectedEntryId ? entries.find((e) => e.id === selectedEntryId) : undefined),
     [entries, selectedEntryId]
   )
+  const deleteTargets = useMemo(() => summary?.team ?? [], [summary?.team])
 
   /** Não pode reportar a si nem a ninguém na própria subárvore (evita ciclo). */
   const forbiddenParentIds = useMemo(() => new Set(highlightedIds), [highlightedIds])
@@ -258,6 +266,41 @@ export default function Organograma() {
     }
   }
 
+  const openDeleteSubtreePreview = () => {
+    if (!selectedEntryId) return
+    setDeleteError(null)
+    setDeletePreviewOpen(true)
+  }
+
+  const closeDeleteFlow = () => {
+    setDeletePreviewOpen(false)
+    setDeleteConfirmOpen(false)
+    setDeleteError(null)
+  }
+
+  const goToFinalDeleteConfirm = () => {
+    setDeletePreviewOpen(false)
+    setDeleteConfirmOpen(true)
+  }
+
+  const confirmDeleteSubtree = async () => {
+    if (!selectedEntryId) return
+    setDeleteBusy(true)
+    setDeleteError(null)
+    try {
+      await deleteSubtree(selectedEntryId)
+      closeDeleteFlow()
+      closeDrawer()
+      await fetchTree()
+      await fetchEntries()
+      await fetchGraph()
+    } catch (e) {
+      setDeleteError((e as Error).message)
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
   const entryLabel = (e: { person_name: string; job_title: string | null }) =>
     e.job_title?.trim() ? `${e.person_name} — ${e.job_title}` : e.person_name
 
@@ -365,10 +408,86 @@ export default function Organograma() {
                   </Tooltip>
                 </>
               }
+              footerActions={
+                selectedEntryId ? (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Trash2 size={16} />}
+                    onClick={openDeleteSubtreePreview}
+                    disabled={sumLoading || deleteBusy}
+                  >
+                    Excluir item/subárvore
+                  </Button>
+                ) : null
+              }
             />
 
           </Box>
         </Drawer>
+
+        <Dialog open={deletePreviewOpen} onClose={deleteBusy ? undefined : closeDeleteFlow} maxWidth="sm" fullWidth>
+          <DialogTitle>Prévia da exclusão</DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
+            {deleteError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {deleteError}
+              </Alert>
+            ) : null}
+            <Typography variant="body2" sx={{ mb: 1.5 }}>
+              Você está prestes a excluir <strong>{deleteTargets.length || 1}</strong> item(ns) desta subárvore.
+            </Typography>
+            <Box sx={{ maxHeight: 260, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
+              {(deleteTargets.length > 0
+                ? deleteTargets
+                : [{
+                    orgEntryId: selectedEntryId ?? 'unknown',
+                    personName: selectedEntryRow?.person_name ?? 'Item selecionado',
+                    jobTitle: selectedEntryRow?.job_title ?? null,
+                  }]
+              ).map((m) => (
+                <Box key={m.orgEntryId} sx={{ py: 0.5, px: 0.5, borderBottom: '1px solid', borderColor: 'divider', '&:last-child': { borderBottom: 0 } }}>
+                  <Typography variant="body2" fontWeight={600}>
+                    {m.personName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {m.jobTitle?.trim() || 'Sem cargo'}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeDeleteFlow} disabled={deleteBusy}>
+              Cancelar
+            </Button>
+            <Button color="error" variant="contained" onClick={goToFinalDeleteConfirm} disabled={deleteBusy}>
+              Continuar
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deleteConfirmOpen} onClose={deleteBusy ? undefined : closeDeleteFlow} maxWidth="xs" fullWidth>
+          <DialogTitle>Confirmar exclusão</DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
+            {deleteError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {deleteError}
+              </Alert>
+            ) : null}
+            <Typography variant="body2">
+              Confirma a exclusão definitiva de <strong>{deleteTargets.length || 1}</strong> item(ns) da subárvore selecionada?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeDeleteFlow} disabled={deleteBusy}>
+              Voltar
+            </Button>
+            <Button color="error" variant="contained" onClick={() => void confirmDeleteSubtree()} disabled={deleteBusy}>
+              {deleteBusy ? 'Excluindo...' : 'Excluir definitivamente'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         <Dialog open={editOpen} onClose={cancelEdit} maxWidth="sm" fullWidth>
           <DialogTitle>Editar cadastro</DialogTitle>

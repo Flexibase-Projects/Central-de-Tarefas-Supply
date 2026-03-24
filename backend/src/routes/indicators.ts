@@ -2,6 +2,7 @@ import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { hasRole } from '../services/permissions.js';
 import { isSupabaseConnectionRefused, SUPABASE_UNAVAILABLE_MESSAGE } from '../utils/supabase-errors.js';
+import { getEffectiveUserId } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -64,6 +65,15 @@ interface RecentAssignedTodo {
   xpReward: number | null;
   projectId: string | null;
   activityId: string | null;
+  assigneeName?: string | null;
+}
+
+interface RecentActivity {
+  id: string;
+  name: string;
+  status: string;
+  dueDate: string | null;
+  updatedAt: string | null;
 }
 
 type TodoRow = {
@@ -102,15 +112,9 @@ type ActivityRow = {
   assigned_to: string | null;
   due_date: string | null;
   created_by: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
 };
-
-function getRequesterId(req: express.Request): string | null {
-  return (
-    ((req as express.Request & { userId?: string }).userId ?? null) ||
-    (req.headers['x-user-id'] as string | undefined) ||
-    null
-  );
-}
 
 function parseScope(scope: unknown): ScopeMode | null {
   if (scope === 'team' || scope === 'me') return scope;
@@ -175,6 +179,23 @@ async function fetchTodosForIndicators() {
 
   if (withAssignedAt.error) throw withAssignedAt.error;
   return (withAssignedAt.data ?? []) as TodoRow[];
+}
+
+async function fetchActivitiesForIndicators() {
+  const withUpdatedAt = await supabase
+    .from('cdt_activities')
+    .select('id, name, status, assigned_to, due_date, created_by, updated_at, created_at');
+
+  if (withUpdatedAt.error && /updated_at|does not exist|column.*not exist/i.test(String(withUpdatedAt.error.message || ''))) {
+    const fallback = await supabase
+      .from('cdt_activities')
+      .select('id, name, status, assigned_to, due_date, created_by');
+    if (fallback.error) throw fallback.error;
+    return (fallback.data ?? []) as ActivityRow[];
+  }
+
+  if (withUpdatedAt.error) throw withUpdatedAt.error;
+  return (withUpdatedAt.data ?? []) as ActivityRow[];
 }
 
 function buildProjectIndicators(params: {
@@ -257,14 +278,20 @@ function buildRecentAssignedTodos(params: {
   todos: TodoRow[];
   projects: ProjectRow[];
   activities: ActivityRow[];
+  users: Array<{ id: string; name: string; email: string }>;
+  scope: ScopeMode;
   currentUserId: string;
 }): RecentAssignedTodo[] {
-  const { todos, projects, activities, currentUserId } = params;
+  const { todos, projects, activities, users, scope, currentUserId } = params;
   const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
   const activityNameById = new Map(activities.map((activity) => [activity.id, activity.name]));
+  const userNameById = new Map(users.map((user) => [user.id, user.name || user.email?.split('@')[0] || '—']));
 
   return [...todos]
-    .filter((todo) => todo.assigned_to === currentUserId)
+    .filter((todo) => {
+      if (scope === 'team') return Boolean(todo.assigned_to);
+      return todo.assigned_to === currentUserId;
+    })
     .sort((a, b) => {
       const bValue = dateValue(b.assigned_at ?? b.updated_at ?? b.created_at);
       const aValue = dateValue(a.assigned_at ?? a.updated_at ?? a.created_at);
@@ -282,6 +309,71 @@ function buildRecentAssignedTodos(params: {
       xpReward: todo.xp_reward ?? null,
       projectId: todo.project_id,
       activityId: todo.activity_id,
+      assigneeName: todo.assigned_to ? userNameById.get(todo.assigned_to) ?? '—' : '—',
+    }));
+}
+
+function buildPendingAssignedTodos(params: {
+  todos: TodoRow[];
+  projects: ProjectRow[];
+  activities: ActivityRow[];
+  users: Array<{ id: string; name: string; email: string }>;
+  scope: ScopeMode;
+  currentUserId: string;
+}): RecentAssignedTodo[] {
+  const { todos, projects, activities, users, scope, currentUserId } = params;
+  const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
+  const activityNameById = new Map(activities.map((activity) => [activity.id, activity.name]));
+  const userNameById = new Map(users.map((user) => [user.id, user.name || user.email?.split('@')[0] || '—']));
+
+  return [...todos]
+    .filter((todo) => {
+      if (todo.completed === true) return false;
+      if (scope === 'team') return Boolean(todo.assigned_to);
+      return todo.assigned_to === currentUserId;
+    })
+    .sort((a, b) => {
+      const aDeadline = dateValue(a.deadline);
+      const bDeadline = dateValue(b.deadline);
+      if (aDeadline !== bDeadline) return aDeadline - bDeadline;
+      const bValue = dateValue(b.assigned_at ?? b.updated_at ?? b.created_at);
+      const aValue = dateValue(a.assigned_at ?? a.updated_at ?? a.created_at);
+      return bValue - aValue;
+    })
+    .map((todo) => ({
+      id: todo.id,
+      title: todo.title,
+      completed: false,
+      assignedAt: todo.assigned_at ?? null,
+      deadline: todo.deadline ?? null,
+      projectName: todo.project_id ? projectNameById.get(todo.project_id) ?? null : null,
+      activityName: todo.activity_id ? activityNameById.get(todo.activity_id) ?? null : null,
+      xpReward: todo.xp_reward ?? null,
+      projectId: todo.project_id,
+      activityId: todo.activity_id,
+      assigneeName: todo.assigned_to ? userNameById.get(todo.assigned_to) ?? '—' : '—',
+    }));
+}
+
+function buildRecentActivities(params: {
+  activities: ActivityRow[];
+  currentUserId: string;
+}): RecentActivity[] {
+  const { activities, currentUserId } = params;
+  return [...activities]
+    .filter((activity) => activity.assigned_to === currentUserId)
+    .sort((a, b) => {
+      const bValue = dateValue(b.updated_at ?? b.created_at ?? b.due_date);
+      const aValue = dateValue(a.updated_at ?? a.created_at ?? a.due_date);
+      return bValue - aValue;
+    })
+    .slice(0, 10)
+    .map((activity) => ({
+      id: activity.id,
+      name: activity.name,
+      status: activity.status,
+      dueDate: activity.due_date ?? null,
+      updatedAt: activity.updated_at ?? activity.created_at ?? null,
     }));
 }
 
@@ -379,7 +471,14 @@ function buildTeamTotals(params: {
  * Returns team indicators for admins and personal indicators for regular users.
  */
 router.get('/', async (req, res) => {
-  const userId = getRequesterId(req);
+  const userId = getEffectiveUserId(req);
+  console.log('[DBG d3f9fe H2] indicators request', {
+    userId,
+    scopeQuery: typeof req.query.scope === 'string' ? req.query.scope : null,
+  });
+  // #region agent log
+  fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/routes/indicators.ts:425',message:'indicators request received',data:{userId,scopeQuery:typeof req.query.scope==='string'?req.query.scope:null},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!userId) {
     return res.status(401).json({ error: 'Nao autenticado' });
   }
@@ -388,28 +487,35 @@ router.get('/', async (req, res) => {
     const isAdmin = await hasRole(userId, 'admin');
     const requestedScope = parseScope(req.query.scope);
     const scope: ScopeMode = !isAdmin ? 'me' : requestedScope ?? 'team';
+    console.log('[DBG d3f9fe H2] indicators scope', {
+      userId,
+      isAdmin,
+      requestedScope,
+      scope,
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H2',location:'backend/src/routes/indicators.ts:434',message:'indicators scope resolved',data:{userId,isAdmin,requestedScope,scope},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
-    const [users, commentsRes, todosRes, projects, activities] = await Promise.all([
+    const [users, commentsRes, todosRes, projects, activitiesList] = await Promise.all([
       fetchUsers(),
       supabase.from('cdt_comments').select('id, created_by, project_id'),
       fetchTodosForIndicators(),
       fetchProjects(),
-      supabase.from('cdt_activities').select('id, name, status, assigned_to, due_date, created_by'),
+      fetchActivitiesForIndicators(),
     ]);
 
     if (commentsRes.error) throw commentsRes.error;
-    if (todosRes.error) throw todosRes.error;
-    if (activities.error) throw activities.error;
 
     const comments = (commentsRes.data ?? []) as CommentRow[];
-    const todos = (todosRes.data ?? []) as TodoRow[];
-    const activitiesList = (activities.data ?? []) as ActivityRow[];
+    const todos = (todosRes ?? []) as TodoRow[];
+    const activities = (activitiesList ?? []) as ActivityRow[];
 
     const byUser = buildUserIndicators({
       users,
       comments,
       todos,
-      activities: activitiesList,
+      activities,
     });
 
     const byProject = buildProjectIndicators({
@@ -421,7 +527,7 @@ router.get('/', async (req, res) => {
     });
 
     const byActivity = buildActivityIndicators({
-      activities: activitiesList,
+      activities,
       scope,
       currentUserId: userId,
     });
@@ -429,33 +535,85 @@ router.get('/', async (req, res) => {
     const personal = buildPersonalSummary({
       todos,
       comments,
-      activities: activitiesList,
+      activities,
       currentUserId: userId,
     });
 
     const recentAssignedTodos = buildRecentAssignedTodos({
       todos,
       projects,
-      activities: activitiesList,
+      activities,
+      users,
+      scope,
       currentUserId: userId,
     });
+    const pendingAssignedTodos = buildPendingAssignedTodos({
+      todos,
+      projects,
+      activities,
+      users,
+      scope,
+      currentUserId: userId,
+    });
+    const allAssignedTodos = todos.filter((todo) => todo.assigned_to === userId);
+    const allAssignedPendingCount = allAssignedTodos.filter((todo) => todo.completed !== true).length;
+    const recentAssignedPendingCount = recentAssignedTodos.filter((todo) => todo.completed !== true).length;
+    console.log('[DBG d3f9fe H6] recent todo composition', {
+      allAssignedCount: allAssignedTodos.length,
+      allAssignedPendingCount,
+      recentAssignedCount: recentAssignedTodos.length,
+      recentAssignedPendingCount,
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H6',location:'backend/src/routes/indicators.ts:486',message:'recent todo composition',data:{allAssignedCount:allAssignedTodos.length,allAssignedPendingCount,recentAssignedCount:recentAssignedTodos.length,recentAssignedPendingCount},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
+    const recentActivities = buildRecentActivities({
+      activities,
+      currentUserId: userId,
+    });
+    console.log('[DBG d3f9fe H3] indicators payload', {
+      scope,
+      personal,
+      byUserCount: byUser.length,
+      byProjectCount: byProject.length,
+      byActivityCount: byActivity.length,
+      recentAssignedTodosCount: recentAssignedTodos.length,
+      recentActivitiesCount: recentActivities.length,
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H3',location:'backend/src/routes/indicators.ts:488',message:'indicators payload sizes',data:{scope,personal,byUserCount:byUser.length,byProjectCount:byProject.length,byActivityCount:byActivity.length,recentAssignedTodosCount:recentAssignedTodos.length,recentActivitiesCount:recentActivities.length},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const team = buildTeamTotals({
       users,
       projects,
-      activities: activitiesList,
+      activities,
       comments,
       todos,
     });
+
+    const safeTeam: TeamTotals = scope === 'team'
+      ? team
+      : {
+          total_users: 0,
+          total_projects: 0,
+          total_activities: 0,
+          total_comments: 0,
+          total_todos_created: 0,
+          total_todos_completed: 0,
+        };
 
     return res.json({
       scope,
       personal,
       recentAssignedTodos,
-      by_user: byUser,
+      pendingAssignedTodos,
+      recentActivities,
+      by_user: scope === 'team' ? byUser : [],
       by_project: byProject,
       by_activity: byActivity,
-      team,
+      team: safeTeam,
     });
   } catch (error: unknown) {
     if (isSupabaseConnectionRefused(error)) {

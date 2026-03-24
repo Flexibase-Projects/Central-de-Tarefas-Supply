@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -26,7 +26,7 @@ import {
   Tooltip,
   Drawer,
 } from '@mui/material'
-import { DollarSign, Plus, RefreshCw, Link2, UserPlus, Building2, UserCircle, Pencil, X } from 'lucide-react'
+import { DollarSign, Plus, RefreshCw, Link2, UserPlus, Building2, UserCircle, Pencil, X, Trash2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import {
   CostTreeFlow,
@@ -44,6 +44,8 @@ import { CostCanvasDrawerPanel } from '@/components/cost-management/CostCanvasDr
 const API_URL = import.meta.env.VITE_API_URL || ''
 const MAIN_HEADER_PX = 59
 const DRAWER_WIDTH = { xs: '100%', sm: 420 } as const
+
+type CostDeletePreviewRow = { key: string; title: string; subtitle?: string }
 
 function brlFieldToNumber(raw: string): number {
   const normalized = raw.trim().replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
@@ -124,6 +126,11 @@ export default function CustosDepartamento() {
   const canvasSpawnRef = useRef<{ x: number; y: number } | null>(null)
   const [pendingNodePlacement, setPendingNodePlacement] = useState<PendingNodePlacement | null>(null)
 
+  const [costDeletePreviewOpen, setCostDeletePreviewOpen] = useState(false)
+  const [costDeleteConfirmOpen, setCostDeleteConfirmOpen] = useState(false)
+  const [costDeleteBusy, setCostDeleteBusy] = useState(false)
+  const [costDeleteError, setCostDeleteError] = useState<string | null>(null)
+
   useEffect(() => {
     void fetchGraph()
     void fetchEntries()
@@ -193,7 +200,117 @@ export default function CustosDepartamento() {
     setDrawerMemberEditOpen(false)
     setDrawerDeptErr(null)
     setDrawerMemberErr(null)
+    setCostDeletePreviewOpen(false)
+    setCostDeleteConfirmOpen(false)
+    setCostDeleteError(null)
   }, [])
+
+  const costDeletePreviewRows = useMemo((): CostDeletePreviewRow[] => {
+    if (!graph || !canvasFocus) return []
+    if (canvasFocus.kind === 'department') {
+      const d = graph.departments.find((x) => x.id === canvasFocus.departmentId)
+      const name = d?.name ?? 'Departamento'
+      const rows: CostDeletePreviewRow[] = [
+        { key: 'dept', title: name, subtitle: 'Exclusão do departamento (centro de custo)' },
+      ]
+      const mems = graph.members.filter((m) => m.department_id === canvasFocus.departmentId)
+      for (const m of mems) {
+        rows.push({
+          key: `mem-${m.user_id}`,
+          title: m.user?.name ?? m.user_id,
+          subtitle: 'Remoção da pessoa neste departamento',
+        })
+      }
+      const links = graph.departmentCosts.filter((l) => l.department_id === canvasFocus.departmentId)
+      for (const l of links) {
+        const c = graph.costItems.find((ci) => ci.id === l.cost_id)
+        rows.push({
+          key: `link-${l.cost_id}`,
+          title: c?.name ?? 'Custo fixo',
+          subtitle: 'Desvinculação — o cadastro do custo permanece no sistema',
+        })
+      }
+      return rows
+    }
+    if (canvasFocus.kind === 'cost') {
+      const c = graph.costItems.find((x) => x.id === canvasFocus.costId)
+      const depts = graph.departmentCosts
+        .filter((l) => l.cost_id === canvasFocus.costId)
+        .map((l) => graph.departments.find((dep) => dep.id === l.department_id))
+        .filter((dep): dep is NonNullable<typeof dep> => Boolean(dep))
+      const rows: CostDeletePreviewRow[] = [
+        {
+          key: 'cost',
+          title: c?.name ?? 'Custo fixo',
+          subtitle: 'Exclusão definitiva do item e de todos os vínculos',
+        },
+      ]
+      for (const dep of depts) {
+        rows.push({
+          key: `dept-${dep.id}`,
+          title: dep.name,
+          subtitle: 'Vínculo com este departamento será removido',
+        })
+      }
+      return rows
+    }
+    const m = graph.members.find(
+      (x) => x.department_id === canvasFocus.departmentId && x.user_id === canvasFocus.userId
+    )
+    const dn = graph.departments.find((dep) => dep.id === canvasFocus.departmentId)?.name ?? 'Departamento'
+    return [
+      {
+        key: 'mem',
+        title: m?.user?.name ?? m?.user_id ?? 'Pessoa',
+        subtitle: `Remoção do vínculo com ${dn}`,
+      },
+    ]
+  }, [graph, canvasFocus])
+
+  const costDeleteButtonLabel =
+    canvasFocus?.kind === 'department'
+      ? 'Excluir item/subárvore'
+      : canvasFocus?.kind === 'cost'
+        ? 'Excluir custo fixo'
+        : 'Remover pessoa do departamento'
+
+  const openCostDeletePreview = () => {
+    setCostDeleteError(null)
+    setCostDeletePreviewOpen(true)
+  }
+
+  const closeCostDeleteFlow = () => {
+    setCostDeletePreviewOpen(false)
+    setCostDeleteConfirmOpen(false)
+    setCostDeleteError(null)
+  }
+
+  const goToCostDeleteFinalConfirm = () => {
+    setCostDeletePreviewOpen(false)
+    setCostDeleteConfirmOpen(true)
+  }
+
+  const confirmCostDelete = async () => {
+    if (!canvasFocus) return
+    setCostDeleteBusy(true)
+    setCostDeleteError(null)
+    try {
+      if (canvasFocus.kind === 'department') {
+        await deleteJson(`/api/departments/${canvasFocus.departmentId}`)
+      } else if (canvasFocus.kind === 'cost') {
+        await deleteJson(`/api/cost-items/${canvasFocus.costId}`)
+      } else {
+        await deleteJson(`/api/departments/${canvasFocus.departmentId}/members/${canvasFocus.userId}`)
+      }
+      closeCostDeleteFlow()
+      closeCostDrawer()
+      await fetchGraph()
+    } catch (e) {
+      setCostDeleteError((e as Error).message)
+    } finally {
+      setCostDeleteBusy(false)
+    }
+  }
 
   useEffect(() => {
     if (canvasFocus?.kind === 'department') {
@@ -602,10 +719,22 @@ export default function CustosDepartamento() {
               borderLeft: 1,
               borderColor: 'divider',
               bgcolor: 'background.paper',
+              boxShadow: (t) => t.shadows[12],
             },
           }}
         >
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2, height: '100%', overflow: 'auto' }}>
+          <Box
+            sx={{
+              p: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              height: '100%',
+              minHeight: 0,
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+            }}
+          >
+            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
             <CostCanvasDrawerPanel
               focus={canvasFocus}
               graph={graph}
@@ -678,9 +807,105 @@ export default function CustosDepartamento() {
               drawerMemberErr={drawerMemberErr}
               drawerMemberSaving={drawerMemberSaving}
               onSaveDrawerMember={() => void saveDrawerMember()}
+              footerActions={
+                canvasFocus ? (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Trash2 size={16} />}
+                    onClick={openCostDeletePreview}
+                    disabled={costDeleteBusy}
+                  >
+                    {costDeleteButtonLabel}
+                  </Button>
+                ) : null
+              }
             />
+            </Box>
           </Box>
         </Drawer>
+
+        <Dialog
+          open={costDeletePreviewOpen}
+          onClose={costDeleteBusy ? undefined : closeCostDeleteFlow}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Prévia da exclusão</DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
+            {costDeleteError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {costDeleteError}
+              </Alert>
+            ) : null}
+            <Typography variant="body2" sx={{ mb: 1.5 }}>
+              Confira o que será alterado (<strong>{costDeletePreviewRows.length}</strong> linha(s)).
+            </Typography>
+            <Box sx={{ maxHeight: 260, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}>
+              {costDeletePreviewRows.map((row) => (
+                <Box
+                  key={row.key}
+                  sx={{
+                    py: 0.5,
+                    px: 0.5,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': { borderBottom: 0 },
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    {row.title}
+                  </Typography>
+                  {row.subtitle ? (
+                    <Typography variant="caption" color="text.secondary" component="div">
+                      {row.subtitle}
+                    </Typography>
+                  ) : null}
+                </Box>
+              ))}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeCostDeleteFlow} disabled={costDeleteBusy}>
+              Cancelar
+            </Button>
+            <Button color="error" variant="contained" onClick={goToCostDeleteFinalConfirm} disabled={costDeleteBusy}>
+              Continuar
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={costDeleteConfirmOpen}
+          onClose={costDeleteBusy ? undefined : closeCostDeleteFlow}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Confirmar exclusão</DialogTitle>
+          <DialogContent sx={{ pt: 1.5 }}>
+            {costDeleteError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {costDeleteError}
+              </Alert>
+            ) : null}
+            <Typography variant="body2">
+              Confirma a operação definitiva sobre <strong>{costDeletePreviewRows.length}</strong> linha(s) listadas?
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeCostDeleteFlow} disabled={costDeleteBusy}>
+              Voltar
+            </Button>
+            <Button
+              color="error"
+              variant="contained"
+              onClick={() => void confirmCostDelete()}
+              disabled={costDeleteBusy}
+            >
+              {costDeleteBusy ? 'Excluindo...' : 'Excluir definitivamente'}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Painel único de ações (como &quot;Gerenciar organograma&quot;) */}
         <Dialog open={manageDialogOpen} onClose={() => setManageDialogOpen(false)} maxWidth="md" fullWidth>

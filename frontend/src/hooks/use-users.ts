@@ -24,6 +24,10 @@ export function useUsers() {
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          setUsers([]);
+          return;
+        }
         throw new Error('Failed to fetch users');
       }
 
@@ -49,15 +53,107 @@ export function useUsers() {
         body: JSON.stringify(userData),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to create user');
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
       }
 
-      const newUser = await response.json();
+      if (!response.ok) {
+        const msg =
+          body &&
+          typeof body === 'object' &&
+          body !== null &&
+          'error' in body &&
+          typeof (body as { error?: string }).error === 'string'
+            ? (body as { error: string }).error
+            : 'Falha ao criar usuário';
+        throw new Error(msg);
+      }
+
+      const newUser = body as User;
       await fetchUsers();
       return newUser;
-    } catch (err: any) {
-      throw new Error(err.message || 'Failed to create user');
+    } catch (err: unknown) {
+      throw new Error(err instanceof Error ? err.message : 'Falha ao criar usuário');
+    }
+  };
+
+  /** Admin: cria usuario no Supabase Auth + cdt_users (senha temporaria no servidor). */
+  const createUserWithAuth = async (userData: {
+    email: string;
+    name: string;
+    avatar_url?: string;
+    role_id?: string;
+  }) => {
+    const response = await fetch(`${API_URL}/api/users/with-auth`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        email: userData.email,
+        name: userData.name,
+        avatar_url: userData.avatar_url ?? null,
+        role_id: userData.role_id ?? null,
+      }),
+    });
+
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+
+    if (!response.ok) {
+      const msg =
+        body &&
+        typeof body === 'object' &&
+        body !== null &&
+        'error' in body &&
+        typeof (body as { error?: string }).error === 'string'
+          ? (body as { error: string }).error
+          : 'Falha ao criar usuario com Auth';
+      throw new Error(msg);
+    }
+
+    const newUser = body as User;
+    await fetchUsers();
+    return newUser;
+  };
+
+  /** Admin: define a senha do usuário no Supabase Auth (cdt_users.id = auth user id). */
+  const setUserAuthPassword = async (
+    id: string,
+    password: string,
+    password_confirm: string,
+  ) => {
+    const response = await fetch(`${API_URL}/api/users/${id}/auth-password`, {
+      method: 'POST',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password, password_confirm }),
+    });
+
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      body = null;
+    }
+
+    if (!response.ok) {
+      const msg =
+        body &&
+        typeof body === 'object' &&
+        body !== null &&
+        'error' in body &&
+        typeof (body as { error?: string }).error === 'string'
+          ? (body as { error: string }).error
+          : 'Falha ao definir senha no Supabase Auth';
+      throw new Error(msg);
     }
   };
 
@@ -69,33 +165,36 @@ export function useUsers() {
         body: JSON.stringify(userData),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update user');
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = null;
       }
 
-      const updatedUser = await response.json();
+      if (!response.ok) {
+        const msg =
+          body &&
+          typeof body === 'object' &&
+          body !== null &&
+          'error' in body &&
+          typeof (body as { error?: string }).error === 'string'
+            ? (body as { error: string }).error
+            : 'Falha ao atualizar usuário';
+        throw new Error(msg);
+      }
+
+      const updatedUser = body as User;
       await fetchUsers();
       return updatedUser;
-    } catch (err: any) {
-      throw new Error(err.message || 'Failed to update user');
+    } catch (err: unknown) {
+      throw new Error(err instanceof Error ? err.message : 'Falha ao atualizar usuário');
     }
   };
 
-  const deleteUser = async (id: string) => {
-    try {
-      const response = await fetch(`${API_URL}/api/users/${id}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete user');
-      }
-
-      await fetchUsers();
-    } catch (err: any) {
-      throw new Error(err.message || 'Failed to delete user');
-    }
+  /** Usuários não são apagados: apenas is_active true/false no CDT. */
+  const setUserActive = async (id: string, is_active: boolean) => {
+    return updateUser(id, { is_active });
   };
 
   const assignRole = async (userId: string, roleId: string) => {
@@ -179,8 +278,10 @@ export function useUsers() {
     loading,
     error,
     createUser,
+    createUserWithAuth,
+    setUserAuthPassword,
     updateUser,
-    deleteUser,
+    setUserActive,
     assignRole,
     removeRole,
     refreshUsers: fetchUsers,

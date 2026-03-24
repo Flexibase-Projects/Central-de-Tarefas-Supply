@@ -24,7 +24,7 @@ import {
   type XYPosition,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Box, CircularProgress, Menu, MenuItem, Snackbar, Alert, Typography } from '@mui/material'
+import { Box, CircularProgress, Menu, MenuItem, Snackbar, Alert, Typography, useTheme } from '@mui/material'
 import { layoutWithDagre } from '@/components/tree-funnel/dagreLayout'
 import type { CostManagementGraph, CostItem, CostCanvasFocus } from '@/types/cost-org'
 import type { OrgEntry } from '@/hooks/use-org'
@@ -354,6 +354,8 @@ function CostCanvasCore({
   orgEntries = [],
   fillHeight = false,
 }: Omit<Props, 'graph' | 'loading' | 'error'> & { graph: CostManagementGraph }) {
+  const theme = useTheme()
+  const isDark = theme.palette.mode === 'dark'
   const screenToFlowRef = useRef<((position: XYPosition) => XYPosition) | null>(null)
   const layoutPositionsRef = useRef<Record<string, XYPosition>>({})
 
@@ -591,53 +593,100 @@ function CostCanvasCore({
   return (
     <>
       <Box sx={flowFrameSx}>
-      <ReactFlow
-        style={{ width: '100%', height: '100%' }}
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onEdgesDelete={onEdgesDelete}
-        onNodeDragStop={onNodeDragStop}
-        isValidConnection={(c) => isValidDeptCostConnectionLike(c)}
-        onNodeClick={onNodeClick}
-        onPaneClick={() => {
-          closeCtx()
-          onCanvasFocusChange(null)
-        }}
-        onPaneContextMenu={onPaneContextMenu}
-        onNodeContextMenu={onNodeContextMenu}
-        nodeTypes={nodeTypes}
-        minZoom={0.2}
-        maxZoom={1.5}
-        deleteKeyCode={['Backspace', 'Delete']}
-        edgesReconnectable={false}
-        nodesConnectable
-        nodesDraggable
-        edgesFocusable
-        connectionRadius={28}
-        connectionLineType={ConnectionLineType.Bezier}
-        proOptions={{ hideAttribution: true }}
-        connectionLineStyle={{ stroke: EDGE_DEPT_ACTIVE, strokeWidth: 1.5 }}
-        defaultEdgeOptions={{
-          type: 'default',
-          style: { stroke: EDGE_NEUTRAL, strokeWidth: 1.25 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 12,
-            height: 12,
-            color: EDGE_DEPT_ACTIVE,
-          },
-        }}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-      >
-        <ScreenToFlowBinder flowFnRef={screenToFlowRef} />
-        <Background gap={16} />
-        <Controls />
-        <MiniMap pannable zoomable />
-      </ReactFlow>
+        <ReactFlow
+          style={{ width: '100%', height: '100%' }}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onEdgesDelete={onEdgesDelete}
+          onNodeDragStop={onNodeDragStop}
+          isValidConnection={(c) => isValidDeptCostConnectionLike(c)}
+          onNodeClick={onNodeClick}
+          onPaneClick={() => {
+            closeCtx()
+            onCanvasFocusChange(null)
+          }}
+          onPaneContextMenu={onPaneContextMenu}
+          onNodeContextMenu={onNodeContextMenu}
+          nodeTypes={nodeTypes}
+          minZoom={0.2}
+          maxZoom={1.5}
+          deleteKeyCode={['Backspace', 'Delete']}
+          edgesReconnectable={false}
+          nodesConnectable
+          nodesDraggable
+          edgesFocusable
+          connectionRadius={28}
+          connectionLineType={ConnectionLineType.Bezier}
+          proOptions={{ hideAttribution: true }}
+          connectionLineStyle={{ stroke: EDGE_DEPT_ACTIVE, strokeWidth: 1.5 }}
+          defaultEdgeOptions={{
+            type: 'default',
+            style: { stroke: EDGE_NEUTRAL, strokeWidth: 1.25 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 12,
+              height: 12,
+              color: EDGE_DEPT_ACTIVE,
+            },
+          }}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          colorMode={isDark ? 'dark' : 'light'}
+        >
+          <ScreenToFlowBinder flowFnRef={screenToFlowRef} />
+          <Background
+            gap={16}
+            color={isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.35)'}
+            bgColor={isDark ? '#0f172a' : '#ffffff'}
+          />
+          <Controls
+            className="cost-flow-controls"
+            style={{
+              background: isDark ? 'rgba(15,23,42,0.9)' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.35)'}`,
+              borderRadius: 8,
+              boxShadow: isDark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 6px 16px rgba(15,23,42,0.12)',
+            }}
+          />
+          <MiniMap
+            pannable
+            zoomable
+            style={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.92)' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.35)'}`,
+              borderRadius: 8,
+              boxShadow: isDark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 6px 16px rgba(15,23,42,0.12)',
+            }}
+            maskColor={isDark ? 'rgba(2,6,23,0.45)' : 'rgba(148,163,184,0.22)'}
+            nodeColor={isDark ? '#94a3b8' : '#64748b'}
+          />
+        </ReactFlow>
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            '& .cost-flow-controls .react-flow__controls-button': {
+              pointerEvents: 'auto',
+              color: isDark ? '#60A5FA' : '#2563EB',
+              borderColor: isDark ? 'rgba(96,165,250,0.35)' : 'rgba(37,99,235,0.28)',
+              backgroundColor: isDark ? 'rgba(30,41,59,0.92)' : 'rgba(255,255,255,0.95)',
+              transition: 'all 0.15s ease',
+            },
+            '& .cost-flow-controls .react-flow__controls-button:hover': {
+              backgroundColor: isDark ? 'rgba(37,99,235,0.22)' : 'rgba(37,99,235,0.1)',
+              color: isDark ? '#93C5FD' : '#1D4ED8',
+            },
+            '& .cost-flow-controls .react-flow__controls-button:focus-visible': {
+              outline: '2px solid',
+              outlineColor: isDark ? 'rgba(96,165,250,0.55)' : 'rgba(37,99,235,0.45)',
+              outlineOffset: '-1px',
+            },
+          }}
+        />
       </Box>
 
       <Menu

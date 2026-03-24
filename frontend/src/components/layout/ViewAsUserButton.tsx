@@ -75,14 +75,14 @@ export function ViewAsUserButton() {
         color="warning"
         variant="filled"
         size="small"
-        sx={{ mr: 1, height: 32, cursor: 'default' }}
+        sx={{ height: 32, cursor: 'default', borderRadius: 2 }}
       />
     )
   }
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>
-      <Box sx={{ position: 'relative', mr: 1 }}>
+      <Box sx={{ position: 'relative' }}>
         <Tooltip title="Ver como usuário">
           <Button
             ref={anchorRef}
@@ -91,7 +91,19 @@ export function ViewAsUserButton() {
             startIcon={starting ? <CircularProgress size={14} /> : <Visibility />}
             onClick={() => setOpen((prev) => !prev)}
             disabled={starting}
-            sx={{ textTransform: 'none', borderRadius: 2, fontSize: 12 }}
+            sx={{
+              textTransform: 'none',
+              borderRadius: 2,
+              fontSize: 12,
+              height: 40,
+              px: 1.25,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              '&:hover': {
+                borderColor: 'divider',
+                bgcolor: 'action.hover',
+              },
+            }}
           >
             Ver como
           </Button>

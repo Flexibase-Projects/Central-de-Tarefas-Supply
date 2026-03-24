@@ -128,7 +128,7 @@ export function RolesTable() {
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField label="Nome (código)" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} disabled={!!editingRole} placeholder="ex: developer" fullWidth />
-            <TextField label="Nome de Exibição" value={formData.display_name} onChange={(e) => setFormData({ ...formData, display_name: e.target.value })} placeholder="ex: Desenvolvedor" fullWidth />
+            <TextField label="Nome de Exibição" value={formData.display_name} onChange={(e) => setFormData({ ...formData, display_name: e.target.value })} placeholder="ex: Usuário" fullWidth />
             <TextField label="Descrição" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Descrição do cargo" fullWidth />
           </Box>
         </DialogContent>

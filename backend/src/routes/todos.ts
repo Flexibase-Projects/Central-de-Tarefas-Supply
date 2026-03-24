@@ -16,6 +16,7 @@ import {
   notifyAdminsTodoXpPending,
   notifyTodoAssigned,
 } from '../services/todo-notifications.js';
+import { isOnOrBeforeDate, toDateKey } from '../utils/date-only.js';
 
 const router = express.Router();
 
@@ -281,8 +282,25 @@ async function getNextSortOrder(params: {
 async function calculateTodoAwardXp(todo: TodoRecord): Promise<number> {
   const linkedReward = await getLinkedAchievementReward(todo.achievement_id ?? null);
   const completedAt = todo.completed_at ? new Date(todo.completed_at) : new Date();
-  const onDeadline =
-    Boolean(todo.deadline) && completedAt.getTime() <= new Date(todo.deadline as string).getTime();
+  const deadlineDate = todo.deadline ? new Date(todo.deadline as string) : null;
+  const onDeadlineByTimestamp =
+    Boolean(deadlineDate) && completedAt.getTime() <= (deadlineDate as Date).getTime();
+  const completedDay = toDateKey(todo.completed_at ?? completedAt.toISOString());
+  const deadlineDay = toDateKey(todo.deadline ?? null);
+  const onDeadlineByDay = isOnOrBeforeDate(todo.completed_at ?? completedAt.toISOString(), todo.deadline ?? null);
+  const onDeadline = onDeadlineByDay;
+  console.log('[DBG d3f9fe H8] todo deadline evaluation', {
+    todoId: todo.id,
+    rawDeadline: todo.deadline ?? null,
+    rawCompletedAt: todo.completed_at ?? null,
+    completedAtIso: completedAt.toISOString(),
+    deadlineIso: deadlineDate ? deadlineDate.toISOString() : null,
+    onDeadlineByTimestamp,
+    onDeadlineByDay,
+  });
+  // #region agent log
+  fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H8',location:'backend/src/routes/todos.ts:291',message:'todo deadline evaluation',data:{todoId:todo.id,rawDeadline:todo.deadline??null,rawCompletedAt:todo.completed_at??null,completedAtIso:completedAt.toISOString(),deadlineIso:deadlineDate?deadlineDate.toISOString():null,onDeadlineByTimestamp,onDeadlineByDay},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return calculateItemCompletionXp({
     baseXp: parseDecimal(todo.xp_reward, 0),
@@ -595,6 +613,38 @@ router.delete('/:id', async (req, res) => {
     if (!requesterId) return;
 
     const { id } = req.params;
+    const { data: currentTodo, error: currentTodoError } = await getTodoByIdCompat(id);
+    if (currentTodoError) throw currentTodoError;
+    if (!currentTodo) {
+      return res.status(404).json({ error: 'Todo not found' });
+    }
+
+    const existingTodo = currentTodo as TodoRecord;
+    let xpDelta = 0;
+    let xpAction: 'none' | 'reverted' = 'none';
+
+    if (existingTodo.completed === true && existingTodo.assigned_to) {
+      try {
+        const reverted = await revertTodoCompletionXp({
+          userId: existingTodo.assigned_to,
+          todoId: existingTodo.id,
+        });
+
+        if (reverted.reverted) {
+          xpDelta = reverted.xpDelta;
+          xpAction = 'reverted';
+        }
+      } catch (gamificationError: any) {
+        if (isGamificationSchemaError(gamificationError)) {
+          console.warn(
+            'Gamification skipped while deleting todo due to missing schema:',
+            gamificationError?.message || gamificationError,
+          );
+        } else {
+          throw gamificationError;
+        }
+      }
+    }
 
     await clearTodoAssignmentNotifications(id);
     await clearTodoXpPendingNotifications(id);
@@ -605,7 +655,7 @@ router.delete('/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
-    res.status(204).send();
+    res.json({ success: true, xpDelta, xpAction });
   } catch (error: any) {
     console.error('Error deleting todo:', error);
     res.status(500).json({ error: error.message || 'Failed to delete todo' });

@@ -19,9 +19,11 @@ import {
   TableHead,
   TableRow,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import { Plus, Pencil, Trash2, UserPlus } from '@/components/ui/icons'
+import { ToggleOn, ToggleOff } from '@mui/icons-material'
+import { Plus, Pencil, UserPlus } from '@/components/ui/icons'
 import { UserWithRole } from '@/types'
 import { useUsers } from '@/hooks/use-users'
 import { useRoles } from '@/hooks/use-roles'
@@ -54,9 +56,9 @@ export function UsersTable() {
   const {
     users,
     loading,
-    createUser,
+    createUserWithAuth,
     updateUser,
-    deleteUser,
+    setUserActive,
     assignRole,
     authList,
     authListLoading,
@@ -69,6 +71,8 @@ export function UsersTable() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null)
   const [formData, setFormData] = useState({ email: '', name: '', avatar_url: '' })
+  const [newUserRoleId, setNewUserRoleId] = useState('')
+  const [savingUser, setSavingUser] = useState(false)
 
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false)
   const [selectedAuthUser, setSelectedAuthUser] = useState<AuthListUser | null>(null)
@@ -102,6 +106,7 @@ export function UsersTable() {
   const handleCreate = () => {
     setEditingUser(null)
     setFormData({ email: '', name: '', avatar_url: '' })
+    setNewUserRoleId(getPreferredRoleId(roleItems))
     setIsUserDialogOpen(true)
   }
 
@@ -116,21 +121,36 @@ export function UsersTable() {
   }
 
   const handleSubmitUser = async () => {
+    setSavingUser(true)
     try {
       if (editingUser) {
         await updateUser(editingUser.id, formData)
       } else {
-        await createUser(formData)
+        await createUserWithAuth({
+          email: formData.email,
+          name: formData.name,
+          avatar_url: formData.avatar_url || undefined,
+          role_id: newUserRoleId || undefined,
+        })
       }
       setIsUserDialogOpen(false)
     } catch (error) {
-      console.error('Error saving user:', error)
+      alert(error instanceof Error ? error.message : 'Erro ao salvar usuario')
+    } finally {
+      setSavingUser(false)
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja desativar este usuario?')) {
-      await deleteUser(id)
+  const handleToggleActive = async (user: UserWithRole) => {
+    const next = !user.is_active
+    const msg = next
+      ? 'Reativar acesso deste usuario?'
+      : 'Desativar acesso deste usuario? Ele nao podera usar o sistema ate ser reativado.'
+    if (!confirm(msg)) return
+    try {
+      await setUserActive(user.id, next)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Erro ao alterar status')
     }
   }
 
@@ -235,21 +255,38 @@ export function UsersTable() {
                       </Select>
                     </FormControl>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ verticalAlign: 'middle' }}>
                     <Chip
                       label={user.is_active ? 'Ativo' : 'Inativo'}
                       size="small"
                       color={user.is_active ? 'success' : 'error'}
                       variant="outlined"
+                      sx={{
+                        minWidth: 76,
+                        justifyContent: 'center',
+                        '& .MuiChip-label': {
+                          px: 1,
+                          width: '100%',
+                          textAlign: 'center',
+                          fontVariantNumeric: 'tabular-nums',
+                        },
+                      }}
                     />
                   </TableCell>
-                  <TableCell align="right">
-                    <IconButton size="small" onClick={() => handleEdit(user)}>
+                  <TableCell align="right" sx={{ verticalAlign: 'middle' }}>
+                    <IconButton size="small" onClick={() => handleEdit(user)} aria-label="Editar usuario">
                       <Pencil size={20} />
                     </IconButton>
-                    <IconButton size="small" color="error" onClick={() => handleDelete(user.id)}>
-                      <Trash2 size={20} />
-                    </IconButton>
+                    <Tooltip title={user.is_active ? 'Desativar acesso' : 'Reativar acesso'}>
+                      <IconButton
+                        size="small"
+                        color={user.is_active ? 'success' : 'error'}
+                        onClick={() => handleToggleActive(user)}
+                        aria-label={user.is_active ? 'Desativar usuario' : 'Reativar usuario'}
+                      >
+                        {user.is_active ? <ToggleOn fontSize="small" /> : <ToggleOff fontSize="small" />}
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))
@@ -379,6 +416,7 @@ export function UsersTable() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               fullWidth
+              disabled={Boolean(editingUser)}
             />
             <TextField
               label="Nome"
@@ -392,12 +430,40 @@ export function UsersTable() {
               onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
               fullWidth
             />
+            {!editingUser && (
+              <FormControl fullWidth size="small">
+                <InputLabel>Cargo inicial</InputLabel>
+                <Select
+                  label="Cargo inicial"
+                  value={newUserRoleId}
+                  onChange={(e) => setNewUserRoleId(String(e.target.value))}
+                  displayEmpty
+                >
+                  <MenuItem value="">
+                    <em>Sem cargo (atribuir depois)</em>
+                  </MenuItem>
+                  {roles.map((role) => (
+                    <MenuItem key={role.id} value={role.id}>
+                      {role.display_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            {!editingUser && (
+              <Typography variant="caption" color="text.secondary">
+                Sera criada conta no Supabase Auth com senha inicial configurada no servidor; no primeiro acesso o
+                usuario define senha forte na tela de login.
+              </Typography>
+            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setIsUserDialogOpen(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleSubmitUser}>
-            Salvar
+          <Button onClick={() => setIsUserDialogOpen(false)} disabled={savingUser}>
+            Cancelar
+          </Button>
+          <Button variant="contained" onClick={handleSubmitUser} disabled={savingUser}>
+            {savingUser ? <CircularProgress size={22} /> : 'Salvar'}
           </Button>
         </DialogActions>
       </Dialog>

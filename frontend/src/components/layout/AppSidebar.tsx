@@ -8,7 +8,6 @@ import {
   Settings,
   Trophy,
   HelpCircle,
-  LogOut,
   ChevronLeft,
   Menu,
   BarChart2,
@@ -20,10 +19,8 @@ import {
   DollarSign,
 } from '@/components/ui/icons'
 import {
-  Avatar,
-  Badge,
   Box,
-  Chip,
+  Badge,
   Divider,
   IconButton,
   Menu as MuiMenu,
@@ -33,11 +30,9 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import { UserLevelProfileDrawer } from '@/components/layout/UserLevelProfileDrawer'
 import { Sun, Moon } from 'lucide-react'
 import { useThemeMode } from '@/theme/ThemeProvider'
 import { usePermissions } from '@/hooks/use-permissions'
-import { useAuth } from '@/contexts/AuthContext'
 import { useUserProgress } from '@/hooks/use-user-progress'
 import { LevelXpBar } from '@/components/master-mode/LevelXpBar'
 import { getTierForLevel } from '@/utils/tier'
@@ -106,58 +101,85 @@ function DemandCard({ count, compact = false }: { count: number | null; compact?
         to="/indicadores"
         style={{ textDecoration: 'none', display: 'block' }}
       >
-        <Box sx={{ p: compact ? 1.25 : 1.5, color: 'text.primary' }}>
+        <Box sx={{ p: compact ? 1 : 1.05, color: 'text.primary', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: hasPending ? 'warning.dark' : 'primary.main' }}>
-              Minhas demandas
-            </Typography>
-            <Chip
-              size="small"
-              label={hasPending ? `${resolvedCount} em aberto` : 'Tudo em dia'}
+            <Typography
+              variant="caption"
               sx={{
-                height: 22,
-                fontSize: 10,
-                fontWeight: 700,
-                bgcolor: hasPending ? 'rgba(245,158,11,0.18)' : 'rgba(37,99,235,0.12)',
-                color: hasPending ? '#92400E' : '#1D4ED8',
-                border: '1px solid',
-                borderColor: hasPending ? 'rgba(245,158,11,0.35)' : 'rgba(37,99,235,0.18)',
-              }}
-            />
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 1, mt: 0.75 }}>
-            <Typography variant={compact ? 'h6' : 'h4'} sx={{ fontWeight: 900, lineHeight: 0.95, letterSpacing: -0.03 }}>
-              {resolvedCount.toString().padStart(2, '0')}
-            </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', pb: 0.4 }}>
-              {hasPending ? 'entregas esperando você' : 'entregas concluídas'}
-            </Typography>
-          </Box>
-
-          {!compact && (
-            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary', lineHeight: 1.4 }}>
-              {hasPending
-                ? 'Abra os cards, feche a fila e avance com consistência.'
-                : 'Tudo em dia. Agora é só manter o ritmo e proteger esse avanço.'}
-            </Typography>
-          )}
-
-          <Box sx={{ mt: 1.25, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box
-              sx={{
-                px: 1,
-                py: 0.4,
-                borderRadius: 999,
-                bgcolor: hasPending ? 'rgba(245,158,11,0.18)' : 'rgba(37,99,235,0.12)',
-                color: hasPending ? 'warning.dark' : 'primary.dark',
-                fontSize: 11,
-                fontWeight: 700,
+                fontWeight: 800,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+                color: hasPending ? 'warning.dark' : 'primary.main',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
               }}
             >
-              {hasPending ? 'Abrir indicadores' : 'Seu ritmo está em dia'}
-            </Box>
+              Minhas demandas
+            </Typography>
           </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              mt: 0.6,
+              px: 0.9,
+              py: 0.35,
+              borderRadius: 1.25,
+              bgcolor: hasPending ? '#D97706' : 'rgba(37,99,235,0.75)',
+              border: '1px solid',
+              borderColor: hasPending ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.25)',
+              boxShadow: hasPending
+                ? '0 0 0 1px rgba(245,158,11,0.044), 0 0 16px rgba(245,158,11,0.09)'
+                : '0 0 0 1px rgba(37,99,235,0.036), 0 0 12px rgba(37,99,235,0.07)',
+              minWidth: 170,
+              transition: 'box-shadow 0.2s ease',
+              '&:hover': {
+                boxShadow: hasPending
+                  ? '0 0 0 1px rgba(245,158,11,0.22), 0 0 16px rgba(245,158,11,0.45)'
+                  : '0 0 0 1px rgba(37,99,235,0.18), 0 0 12px rgba(37,99,235,0.35)',
+              },
+            }}
+          >
+            <Typography
+              variant="body1"
+              sx={{
+                fontWeight: 800,
+                fontSize: 15,
+                lineHeight: 1,
+                letterSpacing: -0.02,
+                color: '#fff',
+              }}
+            >
+              {resolvedCount.toString().padStart(2, '0')}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 600,
+                fontSize: 11,
+                lineHeight: 1.1,
+                color: 'rgba(255,255,255,0.95)',
+              }}
+            >
+              {hasPending ? 'entregas em aberto' : 'entregas concluídas'}
+            </Typography>
+          </Box>
+          <Typography
+            variant="caption"
+            sx={{
+              mt: 0.6,
+              display: 'inline-block',
+              color: hasPending ? 'warning.dark' : 'primary.dark',
+              fontWeight: 700,
+              fontSize: 10.5,
+              textAlign: 'center',
+            }}
+          >
+            Abrir indicadores
+          </Typography>
         </Box>
       </Box>
     </Paper>
@@ -172,11 +194,9 @@ export function AppSidebar(props: AppSidebarProps = {}) {
   const isLight = theme.palette.mode === 'light'
   const { mode, toggleTheme } = useThemeMode()
   const { hasPermission, hasRole } = usePermissions()
-  const { logout, currentUser } = useAuth()
   const { data: progressData, loading: progressLoading } = useUserProgress()
   const [internalCollapsed, setInternalCollapsed] = useState(false)
   const [levelMenuAnchor, setLevelMenuAnchor] = useState<HTMLElement | null>(null)
-  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const { count: pendingTodosCount } = useMyPendingTodosCount()
   const isCollapsed = controlledCollapsed ?? internalCollapsed
 
@@ -195,11 +215,6 @@ export function AppSidebar(props: AppSidebarProps = {}) {
       }),
     })).filter((s) => s.items.length > 0)
   }, [hasPermission, hasRole])
-
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login', { replace: true })
-  }
 
   const sidebarBg = isLight ? '#ffffff' : theme.palette.background.default
   const borderColor = theme.palette.divider
@@ -549,130 +564,7 @@ export function AppSidebar(props: AppSidebarProps = {}) {
           })}
         </MuiMenu>
 
-        <Divider sx={{ borderColor: borderColor, my: 0.5 }} />
-
-        {!isCollapsed && currentUser ? (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 0.5,
-              width: '100%',
-              px: 0.5,
-              py: 0.5,
-            }}
-          >
-            <Tooltip title="Meu perfil, nível e indicadores" placement="right">
-              <Box
-                component="button"
-                type="button"
-                onClick={() => setProfileDrawerOpen(true)}
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.75,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  border: 'none',
-                  background: 'transparent',
-                  padding: '4px 6px',
-                  margin: '-4px -6px',
-                  borderRadius: 1,
-                  color: isActiveLink('/perfil') ? activeColor : theme.palette.text.primary,
-                  overflow: 'hidden',
-                  textAlign: 'left',
-                  transition: 'color 0.15s, background-color 0.15s',
-                  '&:hover': {
-                    color: activeColor,
-                    bgcolor: hoverBg,
-                  },
-                }}
-              >
-                <Person size={14} style={{ flexShrink: 0 }} />
-                <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {currentUser.name}
-                </Box>
-              </Box>
-            </Tooltip>
-            <Tooltip title="Sair" placement="right">
-              <IconButton
-                onClick={handleLogout}
-                sx={{
-                  borderRadius: 1,
-                  p: 0.5,
-                  color: 'error.main',
-                  '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
-                }}
-                size="small"
-              >
-                <LogOut size={16} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ) : currentUser ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, width: '100%' }}>
-            <Tooltip title="Meu perfil, nível e indicadores" placement="right">
-              <IconButton
-                onClick={() => setProfileDrawerOpen(true)}
-                size="small"
-                sx={{
-                  borderRadius: 2,
-                  p: 0.25,
-                  border: `1px solid ${borderColor}`,
-                  '&:hover': { bgcolor: hoverBg },
-                }}
-              >
-                <Avatar src={currentUser.avatar_url ?? undefined} sx={{ width: 32, height: 32, fontSize: 13, fontWeight: 700 }}>
-                  {currentUser.name?.[0]?.toUpperCase() ?? '?'}
-                </Avatar>
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Sair" placement="right">
-              <IconButton
-                onClick={handleLogout}
-                sx={{
-                  width: '100%',
-                  borderRadius: 1,
-                  justifyContent: 'center',
-                  py: 0.5,
-                  color: 'error.main',
-                  '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
-                }}
-                size="small"
-              >
-                <LogOut size={16} />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        ) : (
-          <Tooltip title={isCollapsed ? 'Sair' : undefined} placement="right">
-            <IconButton
-              onClick={handleLogout}
-              sx={{
-                width: '100%',
-                borderRadius: 1,
-                justifyContent: isCollapsed ? 'center' : 'flex-start',
-                py: 0.875,
-                px: isCollapsed ? 0 : 1.25,
-                gap: 1,
-                color: 'error.main',
-                '&:hover': { bgcolor: 'error.light', color: 'error.dark' },
-              }}
-              size="small"
-            >
-              <LogOut size={16} />
-              {!isCollapsed && <Box component="span" sx={{ fontSize: 13, fontWeight: 600 }}>Sair</Box>}
-            </IconButton>
-          </Tooltip>
-        )}
       </Box>
-
-      <UserLevelProfileDrawer open={profileDrawerOpen} onClose={() => setProfileDrawerOpen(false)} />
     </Box>
   )
 }

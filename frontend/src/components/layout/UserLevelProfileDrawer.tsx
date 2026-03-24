@@ -12,10 +12,10 @@ import {
   useTheme,
 } from '@mui/material'
 import { X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useUserProgress } from '@/hooks/use-user-progress'
 import { useIndicators } from '@/hooks/use-indicators'
+import { useProfileDrawerActions } from '@/hooks/use-profile-drawer-actions'
 import { getTierForLevel } from '@/utils/tier'
 import { TierBadge } from '@/components/gamification/TierBadge'
 import { Person, BarChart2, ExternalLink, MessageCircleIcon, List, CheckCircle, ClipboardList } from '@/components/ui/icons'
@@ -97,8 +97,8 @@ export interface UserLevelProfileDrawerProps {
 export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawerProps) {
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
-  const navigate = useNavigate()
   const { currentUser } = useAuth()
+  const { goPerfil, goIndicadores, handleLogout } = useProfileDrawerActions({ onClose })
   const { data: progress, loading: progressLoading } = useUserProgress()
   const { data: indicators, loading: indicatorsLoading, error: indicatorsError } = useIndicators()
 
@@ -112,16 +112,6 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
   const bannerGradient = isLight
     ? `linear-gradient(135deg, ${tier.color}35 0%, ${theme.palette.primary.main}28 50%, ${tier.color}20 100%)`
     : `linear-gradient(125deg, ${tier.color}55 0%, #1b2838 35%, #171a21 70%, ${tier.color}25 100%)`
-
-  const goPerfil = () => {
-    onClose()
-    navigate('/perfil')
-  }
-
-  const goIndicadores = () => {
-    onClose()
-    navigate('/indicadores')
-  }
 
   if (!currentUser) return null
 
@@ -362,7 +352,16 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
           startIcon={<ExternalLink size={16} />}
           sx={{ fontWeight: 600, textTransform: 'none', borderRadius: 2 }}
         >
-          Indicadores do time
+          Ver meus indicadores
+        </Button>
+        <Button
+          fullWidth
+          variant="text"
+          color="error"
+          onClick={handleLogout}
+          sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2 }}
+        >
+          Desconectar
         </Button>
       </Box>
     </Drawer>

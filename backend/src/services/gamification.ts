@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase.js';
 import { getLevelFromTotalXp } from '../utils/level-xp.js';
 import { PRESET_ACHIEVEMENTS, type AchievementDef, evaluateAchievements } from '../utils/achievement-engine.js';
+import { isOnOrBeforeDate } from '../utils/date-only.js';
 
 type AchievementMode = 'global_auto' | 'linked_item' | 'manual';
 
@@ -230,10 +231,10 @@ async function fetchStats(userId: string): Promise<UserStatsContext> {
   const completedActivities = activities.length;
 
   const deadlineTodos = todos.filter(
-    (t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline),
+    (t) => isOnOrBeforeDate(t.completed_at ?? null, t.deadline ?? null),
   ).length;
   const deadlineActivities = activities.filter(
-    (a) => a.completed_at && a.due_date && new Date(a.completed_at) <= new Date(a.due_date),
+    (a) => isOnOrBeforeDate(a.completed_at ?? null, a.due_date ?? null),
   ).length;
   const challengeTodos = todos.filter((t) => t.achievement_id != null).length;
 

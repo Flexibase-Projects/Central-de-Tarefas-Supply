@@ -138,6 +138,8 @@ export interface User {
   name: string
   avatar_url: string | null
   is_active: boolean
+  /** Quando true, fluxo de login oferece definir senha forte (convite com senha temporaria). */
+  must_set_password?: boolean
   created_at: string
   updated_at: string
 }

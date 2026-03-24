@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import {
   Box,
@@ -36,7 +36,8 @@ import {
 import { useIndicators } from '@/hooks/use-indicators'
 import { useAuth } from '@/contexts/AuthContext'
 import { useMyPendingTodosCount } from '@/hooks/use-my-pending-todos'
-import type { ProjectIndicator, ActivityIndicator } from '@/types'
+import type { ProjectIndicator } from '@/types'
+import { formatDatePtBr } from '@/lib/date-only'
 
 const cell = dashboardTableCellSx
 
@@ -44,25 +45,20 @@ export default function Dashboard() {
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
   const { data, loading, error, refresh } = useIndicators()
-  const { currentUser, hasRole } = useAuth()
+  const { hasRole } = useAuth()
   const isAdmin = hasRole('admin')
   const { count: pendingCount } = useMyPendingTodosCount()
 
   // Dados do próprio usuário na lista by_user
   const personal = data?.personal ?? null
 
-  // Mapa id -> nome (usado para exibir responsáveis)
-  const userNameById = useMemo(() => {
-    const map = new Map<string, string>()
-    data?.by_user?.forEach((u) => map.set(u.user_id, u.name))
-    return map
-  }, [data?.by_user])
-
   // Atividades abertas: admin vê todas; usuário vê só as suas
   const activitiesOpen = useMemo(() => {
     const list = data?.by_activity?.filter((a) => a.status !== 'done') ?? []
-    return isAdmin ? list : list.filter((a) => a.assigned_to === currentUser?.id)
-  }, [data?.by_activity, isAdmin, currentUser?.id])
+    return isAdmin ? list : list
+  }, [data?.by_activity, isAdmin])
+  const recentTodos = data?.recentAssignedTodos ?? []
+  const pendingTodosOnly = data?.pendingAssignedTodos ?? []
 
   const team = data?.team
 
@@ -80,22 +76,39 @@ export default function Dashboard() {
     return [...list].sort((a, b) => b.todos_count - a.todos_count).slice(0, 5)
   }, [data?.by_project])
 
-  const openActivitiesPreview = useMemo(
-    () => activitiesOpen.slice(0, 8),
-    [activitiesOpen],
+  const recentTodosPreview = useMemo(
+    () =>
+      [...recentTodos]
+        .sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1
+          return 0
+        })
+        .slice(0, 8),
+    [recentTodos],
   )
+  const pendingTodosPreview = useMemo(
+    () => (isAdmin ? pendingTodosOnly : pendingTodosOnly.slice(0, 8)),
+    [isAdmin, pendingTodosOnly],
+  )
+
+  useEffect(() => {
+    const pendingInRecent = recentTodos.filter((todo) => !todo.completed).length
+    const pendingInPreview = recentTodosPreview.filter((todo) => !todo.completed).length
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H7',location:'frontend/src/pages/Dashboard.tsx:96',message:'dashboard todo preview composition',data:{recentCount:recentTodos.length,pendingInRecent,pendingInPreview,previewCount:recentTodosPreview.length},timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+  }, [recentTodos, recentTodosPreview])
 
   const maxTodoBar = Math.max(1, todosCreated, todosCompleted)
 
-  const metrics: DashboardMetricCardProps[] = team
-    ? [
+  const metrics: DashboardMetricCardProps[] = [
         {
           label: 'Projetos',
-          value: team.total_projects,
+          value: isAdmin ? (team?.total_projects ?? 0) : topProjects.length,
           icon: Folder,
           iconColor: theme.palette.primary.main,
           iconBg: isLight ? 'rgba(37,99,235,0.1)' : 'rgba(96,165,250,0.15)',
-          caption: 'Cadastrados no sistema',
+          caption: isAdmin ? 'Cadastrados no sistema' : 'Com to-dos atribuídos a você',
         },
         {
           label: isAdmin ? 'Atividades em aberto' : 'Minhas atividades',
@@ -103,7 +116,7 @@ export default function Dashboard() {
           icon: ClipboardList,
           iconColor: isLight ? '#D97706' : '#FBBF24',
           iconBg: isLight ? 'rgba(217,119,6,0.1)' : 'rgba(251,191,36,0.12)',
-          caption: isAdmin ? `${team.total_activities} no total` : `${team.total_activities} no sistema`,
+          caption: isAdmin ? `${team?.total_activities ?? 0} no total` : `${activitiesAssigned} atribuídas`,
         },
         {
           label: isAdmin ? 'Comentários' : 'Meus comentários',
@@ -126,7 +139,6 @@ export default function Dashboard() {
               : undefined,
         },
       ]
-    : []
 
   return (
     <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
@@ -223,6 +235,67 @@ export default function Dashboard() {
             </Paper>
           ) : null}
 
+          <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+            <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+              <Typography variant="subtitle2" fontWeight={600}>
+                TO-DOs pendentes
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {isAdmin ? `Total de ${pendingTodosPreview.length} item(ns)` : 'Em linha, até 8 itens'}
+              </Typography>
+            </Box>
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
+                    <TableCell sx={{ ...cell, fontWeight: 600 }}>TO-DO</TableCell>
+                    <TableCell sx={{ ...cell, fontWeight: 600 }}>Projeto</TableCell>
+                    {isAdmin && <TableCell sx={{ ...cell, fontWeight: 600 }}>Responsável</TableCell>}
+                    <TableCell sx={{ ...cell, fontWeight: 600 }}>Prazo</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pendingTodosPreview.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={isAdmin ? 4 : 3} sx={cell}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhum TO-DO pendente.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    pendingTodosPreview.map((todo) => (
+                      <TableRow key={todo.id} hover>
+                        <TableCell sx={cell}>
+                          <Typography variant="body2" fontWeight={500} noWrap sx={{ maxWidth: 320 }}>
+                            {todo.title}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={cell}>
+                          <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 180 }}>
+                            {todo.projectName ?? '—'}
+                          </Typography>
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell sx={cell}>
+                            <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 180 }}>
+                              {todo.assigneeName ?? '—'}
+                            </Typography>
+                          </TableCell>
+                        )}
+                        <TableCell sx={cell}>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {formatDatePtBr(todo.deadline, 'Sem prazo')}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+
           <Box
             sx={{
               display: 'grid',
@@ -291,50 +364,54 @@ export default function Dashboard() {
             <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
               <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
                 <Typography variant="subtitle2" fontWeight={600}>
-                  {isAdmin ? 'Atividades em aberto' : 'Minhas atividades'}
+                  {isAdmin ? 'Últimos TO-DOs do time' : 'Últimos TO-DOs'}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  Até 8 itens — veja todos em Indicadores
+                  {isAdmin ? 'Últimos 8 itens do time' : 'Até 8 itens'}
                 </Typography>
               </Box>
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'action.hover' }}>
-                      <TableCell sx={{ ...cell, fontWeight: 600 }}>Atividade</TableCell>
+                      <TableCell sx={{ ...cell, fontWeight: 600 }}>TO-DO</TableCell>
+                    {isAdmin && <TableCell sx={{ ...cell, fontWeight: 600 }}>Responsável</TableCell>}
                       <TableCell sx={{ ...cell, fontWeight: 600 }}>Status</TableCell>
-                      {isAdmin && (
-                        <TableCell sx={{ ...cell, fontWeight: 600 }}>Responsável</TableCell>
-                      )}
+                      <TableCell sx={{ ...cell, fontWeight: 600 }}>Projeto</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {openActivitiesPreview.length === 0 ? (
+                    {recentTodosPreview.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={isAdmin ? 3 : 2} sx={cell}>
+                        <TableCell colSpan={isAdmin ? 4 : 3} sx={cell}>
                           <Typography variant="body2" color="text.secondary">
-                            Nenhuma atividade pendente.
+                            Nenhum TO-DO recente.
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      openActivitiesPreview.map((a: ActivityIndicator) => (
-                        <TableRow key={a.activity_id} hover>
+                      recentTodosPreview.map((todo) => (
+                        <TableRow key={todo.id} hover>
                           <TableCell sx={cell}>
                             <Typography variant="body2" fontWeight={500} noWrap sx={{ maxWidth: 180 }}>
-                              {a.activity_name}
+                              {todo.title}
                             </Typography>
-                          </TableCell>
-                          <TableCell sx={cell}>
-                            <DashboardStatusChip status={a.status} />
                           </TableCell>
                           {isAdmin && (
                             <TableCell sx={cell}>
-                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 140 }}>
-                                {a.assigned_to ? userNameById.get(a.assigned_to) ?? '—' : '—'}
+                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 160 }}>
+                                {todo.assigneeName ?? '—'}
                               </Typography>
                             </TableCell>
                           )}
+                          <TableCell sx={cell}>
+                            <DashboardStatusChip status={todo.completed ? 'done' : 'in_progress'} />
+                          </TableCell>
+                          <TableCell sx={cell}>
+                            <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 140 }}>
+                              {todo.projectName ?? '—'}
+                            </Typography>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

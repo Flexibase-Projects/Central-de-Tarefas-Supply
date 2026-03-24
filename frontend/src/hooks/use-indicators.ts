@@ -41,6 +41,14 @@ export interface IndicatorsActivityRow {
   due_date: string | null
 }
 
+export interface RecentActivity {
+  id: string
+  name: string
+  status: string
+  dueDate: string | null
+  updatedAt: string | null
+}
+
 export interface IndicatorsPersonalSummary {
   commentsCount: number
   todosAssignedTotal: number
@@ -60,6 +68,7 @@ export interface RecentAssignedTodo {
   xpReward: number
   projectId?: string | null
   activityId?: string | null
+  assigneeName?: string | null
 }
 
 export interface IndicatorsViewData {
@@ -67,6 +76,8 @@ export interface IndicatorsViewData {
   team: IndicatorsTeamTotals
   personal: IndicatorsPersonalSummary
   recentAssignedTodos: RecentAssignedTodo[]
+  pendingAssignedTodos: RecentAssignedTodo[]
+  recentActivities: RecentActivity[]
   by_user: IndicatorsUserRow[]
   by_project: IndicatorsProjectRow[]
   by_activity: IndicatorsActivityRow[]
@@ -85,6 +96,7 @@ type RawPersonalSummary = {
 }
 
 type RawRecentTodo = Partial<RecentAssignedTodo>
+type RawRecentActivity = Partial<RecentActivity>
 
 function toNumber(value: unknown, fallback = 0): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -161,9 +173,29 @@ function normalizeRecentAssignedTodos(raw: unknown): RecentAssignedTodo[] {
         xpReward: toNumber(row.xpReward, 0),
         projectId: typeof row.projectId === 'string' ? row.projectId : null,
         activityId: typeof row.activityId === 'string' ? row.activityId : null,
+        assigneeName: typeof row.assigneeName === 'string' ? row.assigneeName : null,
       }
     })
     .filter((item): item is RecentAssignedTodo => item !== null)
+}
+
+function normalizeRecentActivities(raw: unknown): RecentActivity[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item): RecentActivity | null => {
+      if (!item || typeof item !== 'object') return null
+      const row = item as RawRecentActivity
+      const id = typeof row.id === 'string' ? row.id : ''
+      if (!id) return null
+      return {
+        id,
+        name: typeof row.name === 'string' ? row.name : 'Atividade',
+        status: typeof row.status === 'string' ? row.status : 'backlog',
+        dueDate: typeof row.dueDate === 'string' ? row.dueDate : null,
+        updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : null,
+      }
+    })
+    .filter((item): item is RecentActivity => item !== null)
 }
 
 function normalizeIndicatorsResponse(
@@ -189,6 +221,8 @@ function normalizeIndicatorsResponse(
     team: normalizeTeamTotals(data.team),
     personal,
     recentAssignedTodos: normalizeRecentAssignedTodos(data.recentAssignedTodos),
+    pendingAssignedTodos: normalizeRecentAssignedTodos((data as Record<string, unknown>).pendingAssignedTodos),
+    recentActivities: normalizeRecentActivities((data as Record<string, unknown>).recentActivities),
     by_user: byUser,
     by_project: Array.isArray(data.by_project) ? data.by_project : [],
     by_activity: Array.isArray(data.by_activity) ? data.by_activity : [],
@@ -212,7 +246,13 @@ export function useIndicators() {
       const url = API_URL
         ? `${API_URL}/api/indicators?${params.toString()}`
         : `/api/indicators?${params.toString()}`
+      // #region agent log
+      fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H5',location:'frontend/src/hooks/use-indicators.ts:246',message:'frontend indicators request',data:{url,isAdmin,currentUserId:currentUser?.id??null,hasAuthorizationHeader:Boolean(getAuthHeaders().Authorization),xUserId:getAuthHeaders()['x-user-id']??null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       const response = await fetch(url, { headers: getAuthHeaders() })
+      // #region agent log
+      fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H5',location:'frontend/src/hooks/use-indicators.ts:248',message:'frontend indicators response status',data:{status:response.status,ok:response.ok},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (!response.ok) {
         if (response.status === 401) {
           setData(null)

@@ -136,9 +136,12 @@ export function NotificationsDropdown() {
           aria-expanded={open ? 'true' : undefined}
           size="small"
           sx={{
+            width: 40,
+            height: 40,
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
+            borderRadius: 2,
             '&:hover': {
               bgcolor: 'action.hover',
             },

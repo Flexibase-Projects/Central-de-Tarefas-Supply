@@ -150,6 +150,19 @@ export function useOrgEntries() {
     [getAuthHeaders]
   )
 
+  const deleteSubtree = useCallback(
+    async (entryId: string) => {
+      const url = API_URL ? `${API_URL}/api/org/entry/${entryId}/subtree` : `/api/org/entry/${entryId}/subtree`
+      const res = await fetch(url, { method: 'DELETE', headers: getAuthHeaders() })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error((payload as { error?: string }).error || 'Erro ao remover subárvore')
+      }
+      return payload as { deletedCount: number; deletedRootId: string; deletedIds: string[] }
+    },
+    [getAuthHeaders]
+  )
+
   const updateEntry = useCallback(
     async (
       id: string,
@@ -178,5 +191,5 @@ export function useOrgEntries() {
     [getAuthHeaders]
   )
 
-  return { entries, loading, fetchEntries, createEntry, deleteEntry, updateEntry }
+  return { entries, loading, fetchEntries, createEntry, deleteEntry, deleteSubtree, updateEntry }
 }

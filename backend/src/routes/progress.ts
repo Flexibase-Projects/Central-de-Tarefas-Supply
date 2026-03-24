@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import { supabase } from '../config/supabase.js';
 import {
   isSupabaseConnectionRefused,
@@ -11,6 +11,8 @@ import {
   evaluateAchievements,
   type AchievementContext,
 } from '../utils/achievement-engine.js';
+import { getEffectiveUserId } from '../middleware/auth.js';
+import { isOnOrBeforeDate } from '../utils/date-only.js';
 
 const router = express.Router();
 
@@ -120,11 +122,11 @@ async function computeXpAndStats(userId: string): Promise<XpResult> {
       const totalXp = roundXp(todoXp + activityXp);
 
       const deadlineTodos = todos.filter(
-        (t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline),
+        (t) => isOnOrBeforeDate(t.completed_at ?? null, t.deadline ?? null),
       ).length;
 
       const deadlineActivities = activities.filter(
-        (a) => a.completed_at && a.due_date && new Date(a.completed_at) <= new Date(a.due_date),
+        (a) => isOnOrBeforeDate(a.completed_at ?? null, a.due_date ?? null),
       ).length;
 
       const challengeTodos = todos.filter((t) => t.achievement_id != null).length;
@@ -213,11 +215,11 @@ async function fetchExtendedStats(userId: string): Promise<ExtendedStats> {
     const activities = (activitiesRes.data ?? []) as ActivityRow[];
 
     const deadlineTodos = todos.filter(
-      (t) => t.completed_at && t.deadline && new Date(t.completed_at) <= new Date(t.deadline),
+      (t) => isOnOrBeforeDate(t.completed_at ?? null, t.deadline ?? null),
     ).length;
 
     const deadlineActivities = activities.filter(
-      (a) => a.completed_at && a.due_date && new Date(a.completed_at) <= new Date(a.due_date),
+      (a) => isOnOrBeforeDate(a.completed_at ?? null, a.due_date ?? null),
     ).length;
 
     const challengeTodos = todos.filter((t) => t.achievement_id != null).length;
@@ -248,12 +250,19 @@ async function fetchExtendedStats(userId: string): Promise<ExtendedStats> {
 
 async function fetchCommentsCount(userId: string): Promise<number> {
   try {
-    const { data, error } = await supabase
+    const primary = await supabase
+      .from('cdt_comments')
+      .select('id')
+      .eq('created_by', userId);
+
+    if (!primary.error) return primary.data?.length ?? 0;
+
+    const fallback = await supabase
       .from('cdt_project_comments')
       .select('id')
       .eq('user_id', userId);
-    if (error) return 0;
-    return data?.length ?? 0;
+    if (fallback.error) return 0;
+    return fallback.data?.length ?? 0;
   } catch {
     return 0;
   }
@@ -371,13 +380,27 @@ async function fetchAchievements(userId: string, ctx: AchievementContext): Promi
 }
 
 router.get('/', async (req, res) => {
-  const userId = (req as express.Request & { userId?: string }).userId;
+  const userId = getEffectiveUserId(req);
+  console.log('[DBG d3f9fe H4] progress request', { userId });
+  // #region agent log
+  fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H4',location:'backend/src/routes/progress.ts:383',message:'progress request received',data:{userId},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (!userId) {
     return res.status(401).json({ error: 'Nao autenticado' });
   }
 
   try {
     const stats = await computeXpAndStats(userId);
+    console.log('[DBG d3f9fe H4] progress stats', {
+      userId,
+      totalXp: stats.totalXp,
+      completedTodos: stats.completedTodos,
+      completedActivities: stats.completedActivities,
+      commentsCount: stats.commentsCount,
+    });
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'pre-fix',hypothesisId:'H4',location:'backend/src/routes/progress.ts:390',message:'progress stats computed',data:{userId,totalXp:stats.totalXp,completedTodos:stats.completedTodos,completedActivities:stats.completedActivities,commentsCount:stats.commentsCount},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const { level, xpInCurrentLevel, xpForNextLevel } = getLevelFromTotalXp(stats.totalXp);
     const tier = getTierForLevel(level);
 

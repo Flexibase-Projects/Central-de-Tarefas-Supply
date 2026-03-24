@@ -222,12 +222,15 @@ router.get('/todo-card-summary', async (req, res) => {
 
     const todos = (todosRes.data ?? []) as ProjectTodoSummaryRow[];
     const activities = (activitiesRes.data ?? []) as ActivitySummaryRow[];
-    const todoCountByEntity = new Map<string, { myAssignedOpenCount: number; xpPendingCount: number }>();
+    const todoCountByEntity = new Map<string, { myAssignedOpenCount: number; totalOpenCount: number; xpPendingCount: number }>();
 
     for (const todo of todos) {
       const entityId = todo.project_id ?? todo.activity_id ?? null;
       if (!entityId) continue;
-      const current = todoCountByEntity.get(entityId) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      const current = todoCountByEntity.get(entityId) ?? { myAssignedOpenCount: 0, totalOpenCount: 0, xpPendingCount: 0 };
+      if (todo.completed !== true) {
+        current.totalOpenCount += 1;
+      }
       if (todo.assigned_to === requesterId && todo.completed !== true) {
         current.myAssignedOpenCount += 1;
       }
@@ -238,25 +241,27 @@ router.get('/todo-card-summary', async (req, res) => {
     }
 
     const projectSummary = projects.map((project: { id: string; name: string; status: string }) => {
-      const counts = todoCountByEntity.get(project.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      const counts = todoCountByEntity.get(project.id) ?? { myAssignedOpenCount: 0, totalOpenCount: 0, xpPendingCount: 0 };
       return {
         entity_type: 'project',
         project_id: project.id,
         project_name: project.name,
         project_status: project.status,
         myAssignedOpenCount: counts.myAssignedOpenCount,
+        totalOpenCount: counts.totalOpenCount,
         xpPendingCount: counts.xpPendingCount,
       };
     });
 
     const activitySummary = activities.map((activity) => {
-      const counts = todoCountByEntity.get(activity.id) ?? { myAssignedOpenCount: 0, xpPendingCount: 0 };
+      const counts = todoCountByEntity.get(activity.id) ?? { myAssignedOpenCount: 0, totalOpenCount: 0, xpPendingCount: 0 };
       return {
         entity_type: 'activity',
         project_id: activity.id,
         project_name: activity.name,
         project_status: activity.status,
         myAssignedOpenCount: counts.myAssignedOpenCount,
+        totalOpenCount: counts.totalOpenCount,
         xpPendingCount: counts.xpPendingCount,
       };
     });

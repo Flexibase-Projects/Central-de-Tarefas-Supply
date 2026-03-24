@@ -45,6 +45,7 @@ import projectCommentsRoutes from './routes/project-comments.js';
 import permissionsRoutes from './routes/permissions.js';
 import rolesRoutes from './routes/roles.js';
 import usersRoutes from './routes/users.js';
+import authHintRoutes from './routes/auth-hint.js';
 import notificationsRoutes from './routes/notifications.js';
 import indicatorsRoutes from './routes/indicators.js';
 import teamCanvasRoutes from './routes/team-canvas.js';
@@ -153,7 +154,8 @@ async function ensureActivityCoversBucket() {
 }
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3002;
+// Lê PORT ou BACKEND_PORT (compatível com .env.local que usa BACKEND_PORT).
+const PORT = Number(process.env.PORT) || Number(process.env.BACKEND_PORT) || 3002;
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3003',
@@ -181,6 +183,7 @@ app.use('/api/project-comments', projectCommentsRoutes);
 app.use('/api/permissions', permissionsRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/auth', authHintRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/indicators', indicatorsRoutes);
 app.use('/api/team-canvas', teamCanvasRoutes);

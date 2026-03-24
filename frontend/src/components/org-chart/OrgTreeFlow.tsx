@@ -12,7 +12,7 @@ import {
   type Node,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Box, CircularProgress, Typography } from '@mui/material'
+import { Box, CircularProgress, Typography, useTheme } from '@mui/material'
 import { layoutWithDagre } from '@/components/tree-funnel/dagreLayout'
 import type { OrgTreeNode } from '@/types/cost-org'
 import OrgPersonNode from './OrgPersonNode'
@@ -84,6 +84,8 @@ type Props = {
 }
 
 export function OrgTreeFlow({ tree, loading, error, highlightedIds, onSelectEntry, fillHeight }: Props) {
+  const theme = useTheme()
+  const isDark = theme.palette.mode === 'dark'
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
@@ -186,11 +188,58 @@ export function OrgTreeFlow({ tree, loading, error, highlightedIds, onSelectEntr
           minZoom={0.2}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}
+          colorMode={isDark ? 'dark' : 'light'}
         >
-          <Background gap={16} />
-          <Controls />
-          <MiniMap pannable zoomable />
+          <Background
+            gap={16}
+            color={isDark ? 'rgba(148,163,184,0.18)' : 'rgba(148,163,184,0.35)'}
+            bgColor={isDark ? '#0f172a' : '#ffffff'}
+          />
+          <Controls
+            style={{
+              background: isDark ? 'rgba(15,23,42,0.9)' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.35)'}`,
+              borderRadius: 8,
+              boxShadow: isDark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 6px 16px rgba(15,23,42,0.12)',
+            }}
+            className="org-flow-controls"
+          />
+          <MiniMap
+            pannable
+            zoomable
+            style={{
+              backgroundColor: isDark ? 'rgba(15,23,42,0.92)' : '#ffffff',
+              border: `1px solid ${isDark ? 'rgba(148,163,184,0.25)' : 'rgba(148,163,184,0.35)'}`,
+              borderRadius: 8,
+              boxShadow: isDark ? '0 8px 20px rgba(0,0,0,0.35)' : '0 6px 16px rgba(15,23,42,0.12)',
+            }}
+            maskColor={isDark ? 'rgba(2,6,23,0.45)' : 'rgba(148,163,184,0.22)'}
+            nodeColor={isDark ? '#94a3b8' : '#64748b'}
+          />
         </ReactFlow>
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            '& .org-flow-controls .react-flow__controls-button': {
+              pointerEvents: 'auto',
+              color: isDark ? '#60A5FA' : '#2563EB',
+              borderColor: isDark ? 'rgba(96,165,250,0.35)' : 'rgba(37,99,235,0.28)',
+              backgroundColor: isDark ? 'rgba(30,41,59,0.92)' : 'rgba(255,255,255,0.95)',
+              transition: 'all 0.15s ease',
+            },
+            '& .org-flow-controls .react-flow__controls-button:hover': {
+              backgroundColor: isDark ? 'rgba(37,99,235,0.22)' : 'rgba(37,99,235,0.1)',
+              color: isDark ? '#93C5FD' : '#1D4ED8',
+            },
+            '& .org-flow-controls .react-flow__controls-button:focus-visible': {
+              outline: '2px solid',
+              outlineColor: isDark ? 'rgba(96,165,250,0.55)' : 'rgba(37,99,235,0.45)',
+              outlineOffset: '-1px',
+            },
+          }}
+        />
       </Box>
     </Box>
   )

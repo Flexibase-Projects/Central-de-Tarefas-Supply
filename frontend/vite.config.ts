@@ -4,9 +4,33 @@ import path from 'path'
 
 const envDir = path.resolve(__dirname, '..')
 
+/**
+ * Alvo do proxy /api → backend Express (lê .env.local na raiz do monorepo).
+ * Não usar SUPABASE_URL aqui: são serviços/portas diferentes (API ≠ :54321).
+ */
+function resolveApiProxyTarget(env: Record<string, string>): string {
+  const fromUrl = (env.BACKEND_DEV_URL || env.VITE_API_PROXY_TARGET || '').trim()
+  if (fromUrl) {
+    try {
+      return new URL(fromUrl).origin
+    } catch {
+      console.warn(
+        '[vite] BACKEND_DEV_URL / VITE_API_PROXY_TARGET inválido; usando BACKEND_HOST + BACKEND_PORT.',
+      )
+    }
+  }
+  const port = Number(env.BACKEND_PORT) || 3002
+  const host = (env.BACKEND_HOST || '127.0.0.1').trim() || '127.0.0.1'
+  return `http://${host}:${port}`
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, '')
+  const apiProxyTarget = resolveApiProxyTarget(env)
+  if (mode === 'development') {
+    console.info(`[vite] proxy /api → ${apiProxyTarget}`)
+  }
 
   return {
     plugins: [react()],
@@ -29,8 +53,10 @@ export default defineConfig(({ mode }) => {
         : true,
       proxy: {
         '/api': {
-          target: `http://localhost:${env.BACKEND_PORT || 3002}`,
+          target: apiProxyTarget,
           changeOrigin: true,
+          timeout: 120_000,
+          proxyTimeout: 120_000,
         },
       },
     },

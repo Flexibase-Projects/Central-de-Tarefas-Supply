@@ -241,6 +241,100 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
   }
 });
 
+// Criar usuario no Supabase Auth + cdt_users (senha temporaria via env), para primeiro acesso definir senha na tela de login.
+router.post('/with-auth', checkRole('admin'), async (req, res) => {
+  try {
+    const requesterId = getRequesterId(req);
+    const tempPassword = String(process.env.MANUAL_INVITE_TEMP_PASSWORD ?? '').trim();
+    if (!tempPassword || tempPassword.length < 6) {
+      return res.status(503).json({
+        error:
+          'MANUAL_INVITE_TEMP_PASSWORD nao configurada ou muito curta no servidor (defina no .env.local, min. 6 caracteres).',
+      });
+    }
+
+    const { email, name, avatar_url, role_id } = req.body as {
+      email?: string;
+      name?: string;
+      avatar_url?: string | null;
+      role_id?: string | null;
+    };
+
+    if (!email || !name) {
+      return res.status(400).json({ error: 'email and name are required' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const displayName = String(name).trim() || normalizedEmail.split('@')[0] || 'Usuario';
+
+    const { data: authCreated, error: authError } = await supabase.auth.admin.createUser({
+      email: normalizedEmail,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: { full_name: displayName, name: displayName },
+    });
+
+    if (authError || !authCreated?.user?.id) {
+      const msg = authError?.message || 'Falha ao criar usuario no Auth';
+      if (/already|registered|exists/i.test(msg) || (authError as { status?: number })?.status === 422) {
+        return res.status(409).json({ error: 'Este email ja esta cadastrado no Supabase Auth.' });
+      }
+      throw authError ?? new Error(msg);
+    }
+
+    const authUserId = authCreated.user.id;
+
+    const { error: insertError } = await supabase.from('cdt_users').insert({
+      id: authUserId,
+      email: normalizedEmail,
+      name: displayName,
+      avatar_url: avatar_url || null,
+      is_active: true,
+      must_set_password: true,
+    });
+
+    if (insertError) {
+      console.error('[with-auth] cdt_users insert failed after auth create:', insertError);
+      return res.status(500).json({
+        error:
+          insertError.message ||
+          'Usuario criado no Auth mas falhou ao gravar em cdt_users. Corrija manualmente ou remova o usuario no painel Auth.',
+      });
+    }
+
+    if (role_id) {
+      await assignRoleToUser({
+        userId: authUserId,
+        roleId: role_id,
+        assignedBy: requesterId,
+      });
+    }
+
+    const { data: userRow, error: userError } = await supabase
+      .from('cdt_users')
+      .select('*')
+      .eq('id', authUserId)
+      .single();
+    if (userError || !userRow) {
+      throw userError ?? new Error('Failed to load created user');
+    }
+
+    const role = await getUserRole(authUserId);
+    res.status(201).json({ ...userRow, role });
+  } catch (error: unknown) {
+    if (error instanceof Error && /admin nativo/i.test(error.message)) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (isSupabaseConnectionRefused(error)) {
+      return res.status(503).json({ error: SUPABASE_UNAVAILABLE_MESSAGE });
+    }
+    console.error('Error creating user with auth:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to create user with auth',
+    });
+  }
+});
+
 // Get users.
 // - for_assignment=true: any approved/authenticated user can list active users.
 // - otherwise: admin only.
@@ -289,6 +383,35 @@ router.get('/', async (req, res) => {
     console.error('Error fetching users:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to fetch users',
+    });
+  }
+});
+
+// Marca primeiro login concluido (senha ja redefinida no fluxo de login).
+router.post('/me/finish-first-login', async (req, res) => {
+  try {
+    const requesterId = getRequesterId(req);
+    if (!requesterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { error } = await supabase
+      .from('cdt_users')
+      .update({
+        must_set_password: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', requesterId);
+
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error: unknown) {
+    if (isSupabaseConnectionRefused(error)) {
+      return res.status(503).json({ error: SUPABASE_UNAVAILABLE_MESSAGE });
+    }
+    console.error('Error finish-first-login:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to update user',
     });
   }
 });

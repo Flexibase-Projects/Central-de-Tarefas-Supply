@@ -8,6 +8,7 @@ export type ProjectTodoCardSummary = {
   project_name: string
   project_status: string
   myAssignedOpenCount: number
+  totalOpenCount?: number
   xpPendingCount: number
 }
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import {
   Box,
   Typography,
@@ -15,7 +15,10 @@ import {
   Alert,
   Chip,
   Divider,
+  TablePagination,
 } from '@mui/material'
+import { useNavigate } from 'react-router-dom'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
   People,
   MessageCircleIcon,
@@ -26,6 +29,7 @@ import {
 } from '@/components/ui/icons'
 import { useIndicators, type RecentAssignedTodo } from '@/hooks/use-indicators'
 import { useAuth } from '@/contexts/AuthContext'
+import { formatDatePtBr } from '@/lib/date-only'
 
 const STATUS_LABELS: Record<string, string> = {
   backlog: 'Backlog',
@@ -35,7 +39,32 @@ const STATUS_LABELS: Record<string, string> = {
   done: 'Concluído',
 }
 
-const tableCellCompact = { py: 0.6, px: 1.5, fontSize: '0.8125rem' } as const
+const tableCellCompact = { py: 0.4, px: 1.25, fontSize: '0.8125rem' } as const
+
+/** Chip de status em linhas de tabela (uma linha, altura baixa). */
+const todoChipTableSx = {
+  height: 22,
+  maxHeight: 22,
+  '& .MuiChip-label': {
+    px: 0.75,
+    py: 0,
+    lineHeight: '20px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+} as const
+
+const ellipsisOneLine = {
+  fontSize: '0.8125rem',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  display: 'block',
+  minWidth: 0,
+  maxWidth: '100%',
+  lineHeight: 1.25,
+} as const
 
 function StatusChip({ status }: { status: string }) {
   const label = STATUS_LABELS[status] ?? status
@@ -45,7 +74,9 @@ function StatusChip({ status }: { status: string }) {
       : status === 'in_progress' || status === 'review'
         ? 'primary'
         : 'default'
-  return <Chip size="small" label={label} color={color} variant="outlined" sx={{ height: 22 }} />
+  return (
+    <Chip size="small" label={label} color={color} variant="outlined" sx={todoChipTableSx} />
+  )
 }
 
 function TodoStatusChip({ completed }: { completed: boolean }) {
@@ -55,7 +86,7 @@ function TodoStatusChip({ completed }: { completed: boolean }) {
       label={completed ? 'Concluído' : 'Pendente'}
       color={completed ? 'success' : 'default'}
       variant={completed ? 'filled' : 'outlined'}
-      sx={{ height: 22 }}
+      sx={todoChipTableSx}
     />
   )
 }
@@ -76,7 +107,10 @@ function BarChartRow({
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-      <Typography variant="caption" sx={{ flexShrink: 0, width: 100, color: 'text.secondary' }} noWrap>
+      <Typography
+        variant="caption"
+        sx={{ flexShrink: 0, minWidth: 100, maxWidth: 220, color: 'text.secondary', whiteSpace: 'normal', lineHeight: 1.35 }}
+      >
         {label}
       </Typography>
       <Box sx={{ flex: 1, minWidth: 0, height: 8, bgcolor: 'action.hover', borderRadius: 1, overflow: 'hidden' }}>
@@ -100,10 +134,7 @@ function BarChartRow({
 }
 
 function formatDate(value: string | null) {
-  if (!value) return '—'
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return '—'
-  return parsed.toLocaleDateString('pt-BR')
+  return formatDatePtBr(value, '—')
 }
 
 function getTodoScopeLabel(todo: RecentAssignedTodo) {
@@ -112,10 +143,98 @@ function getTodoScopeLabel(todo: RecentAssignedTodo) {
   return '—'
 }
 
+/** Titulos curtos: uma linha com ellipsis, sem botao. Titulos longos: chevron para expandir. */
+const TODO_TITLE_EXPAND_THRESHOLD = 56
+
+function TodoTitleCell({
+  rowId,
+  title,
+  expandedRows,
+  onToggle,
+  expandThreshold = TODO_TITLE_EXPAND_THRESHOLD,
+}: {
+  rowId: string
+  title: string
+  expandedRows: Set<string>
+  onToggle: (rowId: string) => void
+  expandThreshold?: number
+}) {
+  const expandable = title.length > expandThreshold
+  const expanded = expandedRows.has(rowId)
+
+  if (!expandable) {
+    return (
+      <Typography
+        className="todo-link"
+        variant="body2"
+        fontWeight={500}
+        sx={{
+          ...ellipsisOneLine,
+          fontWeight: 500,
+        }}
+      >
+        {title}
+      </Typography>
+    )
+  }
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: expanded ? 'flex-start' : 'center', gap: 0.5, minWidth: 0, width: '100%' }}>
+      <Box
+        component="button"
+        type="button"
+        onClick={(e: MouseEvent<HTMLButtonElement>) => {
+          e.stopPropagation()
+          onToggle(rowId)
+        }}
+        aria-label={expanded ? 'Recolher detalhes do to-do' : 'Expandir detalhes do to-do'}
+        sx={{
+          border: 'none',
+          background: 'transparent',
+          p: 0,
+          m: 0,
+          width: 20,
+          height: 20,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'text.secondary',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </Box>
+      <Typography
+        className="todo-link"
+        variant="body2"
+        fontWeight={500}
+        sx={{
+          fontSize: '0.8125rem',
+          overflow: 'hidden',
+          textOverflow: expanded ? 'clip' : 'ellipsis',
+          whiteSpace: expanded ? 'normal' : 'nowrap',
+          display: 'block',
+          minWidth: 0,
+          width: '100%',
+          lineHeight: 1.35,
+          wordBreak: expanded ? 'break-word' : 'normal',
+        }}
+      >
+        {title}
+      </Typography>
+    </Box>
+  )
+}
+
 export default function Indicadores() {
   const { data, loading, error } = useIndicators()
   const { hasRole } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = hasRole('admin')
+  const [pendingTodosPage, setPendingTodosPage] = useState(0)
+  const [expandedTodoRows, setExpandedTodoRows] = useState<Set<string>>(new Set())
+  const pendingTodosRowsPerPage = 10
 
   const personal = data?.personal
   const team = data?.team
@@ -123,6 +242,8 @@ export default function Indicadores() {
   const byProject = data?.by_project ?? []
   const byActivity = data?.by_activity ?? []
   const recentTodos = data?.recentAssignedTodos ?? []
+  const pendingTodos = data?.pendingAssignedTodos ?? []
+  const recentActivities = data?.recentActivities ?? []
 
   const userNameById = useMemo(() => {
     const map = new Map<string, string>()
@@ -143,6 +264,48 @@ export default function Indicadores() {
 
   const maxTodosProject = Math.max(1, ...byProject.map((p) => p.todos_count))
   const maxTodosAssigned = Math.max(1, todosAssignedTotal, todosAssignedCompleted)
+  const sortedPendingTodos = useMemo(() => {
+    return [...pendingTodos].sort((a, b) => {
+      const aHasDeadline = Boolean(a.deadline)
+      const bHasDeadline = Boolean(b.deadline)
+      if (aHasDeadline && bHasDeadline) return new Date(a.deadline as string).getTime() - new Date(b.deadline as string).getTime()
+      if (aHasDeadline) return -1
+      if (bHasDeadline) return 1
+      return new Date(b.assignedAt ?? 0).getTime() - new Date(a.assignedAt ?? 0).getTime()
+    })
+  }, [pendingTodos])
+  const paginatedPendingTodos = sortedPendingTodos.slice(
+    pendingTodosPage * pendingTodosRowsPerPage,
+    pendingTodosPage * pendingTodosRowsPerPage + pendingTodosRowsPerPage,
+  )
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(sortedPendingTodos.length / pendingTodosRowsPerPage) - 1)
+    if (pendingTodosPage > maxPage) {
+      setPendingTodosPage(maxPage)
+    }
+  }, [pendingTodosPage, pendingTodosRowsPerPage, sortedPendingTodos.length])
+
+  const handlePendingTodoClick = (todo: RecentAssignedTodo) => {
+    if (todo.activityId) {
+      navigate(`/atividades?activity=${encodeURIComponent(todo.activityId)}&todo=${encodeURIComponent(todo.id)}`)
+      return
+    }
+    if (todo.projectId) {
+      navigate(`/desenvolvimentos?project=${encodeURIComponent(todo.projectId)}&todo=${encodeURIComponent(todo.id)}`)
+      return
+    }
+    navigate(`/atividades?todo=${encodeURIComponent(todo.id)}`)
+  }
+
+  const toggleExpandedTodoRow = (rowId: string) => {
+    setExpandedTodoRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(rowId)) next.delete(rowId)
+      else next.add(rowId)
+      return next
+    })
+  }
 
   if (loading) {
     return (
@@ -165,7 +328,7 @@ export default function Indicadores() {
   }
 
   return (
-    <Box sx={{ height: '100%', overflow: 'auto', p: 2.5 }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', p: 2.5, pb: 4, boxSizing: 'border-box' }}>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>
         {isAdmin ? 'Indicadores do time' : 'Meus indicadores'}
       </Typography>
@@ -207,7 +370,7 @@ export default function Indicadores() {
               </Typography>
             </Box>
             <Typography variant="h5" fontWeight={700}>
-              {team?.total_projects ?? 0}
+              {isAdmin ? (team?.total_projects ?? 0) : byProject.length}
             </Typography>
           </CardContent>
         </Card>
@@ -303,6 +466,105 @@ export default function Indicadores() {
         </Paper>
       )}
 
+      {isAdmin && (
+        <>
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
+            TO-DOs pendentes do time
+          </Typography>
+          <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%', minWidth: 720 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '28%', minWidth: 140 }}>TO-DO</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '22%', minWidth: 100 }}>Origem</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '18%', minWidth: 88 }}>Responsável</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 100, whiteSpace: 'nowrap' }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 96, whiteSpace: 'nowrap' }}>Prazo</TableCell>
+                    <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600, width: 48 }}>XP</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedPendingTodos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhum to-do pendente no time.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedPendingTodos.map((todo: RecentAssignedTodo, idx: number) => {
+                      const rowId = `admin-pending-${todo.id}`
+                      return (
+                        <TableRow
+                          key={rowId}
+                          hover
+                          onClick={() => handlePendingTodoClick(todo)}
+                          sx={{
+                            bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover',
+                            cursor: 'pointer',
+                            '&:hover .todo-link': { textDecoration: 'underline' },
+                          }}
+                        >
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <TodoTitleCell rowId={rowId} title={todo.title} expandedRows={expandedTodoRows} onToggle={toggleExpandedTodoRow} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              title={getTodoScopeLabel(todo)}
+                              sx={ellipsisOneLine}
+                            >
+                              {getTodoScopeLabel(todo)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              title={todo.assigneeName ?? '—'}
+                              sx={ellipsisOneLine}
+                            >
+                              {todo.assigneeName ?? '—'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', width: 100 }}>
+                            <TodoStatusChip completed={todo.completed} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                              {formatDate(todo.deadline)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography component="span" color="primary.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
+                              {todo.xpReward}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {sortedPendingTodos.length > pendingTodosRowsPerPage && (
+              <TablePagination
+                component="div"
+                count={sortedPendingTodos.length}
+                page={pendingTodosPage}
+                onPageChange={(_, nextPage) => setPendingTodosPage(nextPage)}
+                rowsPerPage={pendingTodosRowsPerPage}
+                rowsPerPageOptions={[pendingTodosRowsPerPage]}
+                labelRowsPerPage=""
+              />
+            )}
+          </Paper>
+        </>
+      )}
+
       <Divider sx={{ my: 2 }} />
 
       {isAdmin ? (
@@ -383,59 +645,208 @@ export default function Indicadores() {
       ) : (
         <>
           <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
+            TO-DOs pendentes atribuídos
+          </Typography>
+          <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%', minWidth: 560 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '38%', minWidth: 140 }}>TO-DO</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '32%', minWidth: 100 }}>Origem</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 100, whiteSpace: 'nowrap' }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 96, whiteSpace: 'nowrap' }}>Prazo</TableCell>
+                    <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600, width: 48 }}>XP</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedPendingTodos.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhum to-do pendente atribuído a você.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedPendingTodos.map((todo: RecentAssignedTodo, idx: number) => {
+                      const rowId = `pending-${todo.id}`
+                      return (
+                        <TableRow
+                          key={rowId}
+                          hover
+                          onClick={() => handlePendingTodoClick(todo)}
+                          sx={{
+                            bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover',
+                            cursor: 'pointer',
+                            '&:hover .todo-link': { textDecoration: 'underline' },
+                          }}
+                        >
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <TodoTitleCell rowId={rowId} title={todo.title} expandedRows={expandedTodoRows} onToggle={toggleExpandedTodoRow} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              title={getTodoScopeLabel(todo)}
+                              sx={ellipsisOneLine}
+                            >
+                              {getTodoScopeLabel(todo)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', width: 100 }}>
+                            <TodoStatusChip completed={todo.completed} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                              {formatDate(todo.deadline)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography component="span" color="primary.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
+                              {todo.xpReward}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            {sortedPendingTodos.length > pendingTodosRowsPerPage && (
+              <TablePagination
+                component="div"
+                count={sortedPendingTodos.length}
+                page={pendingTodosPage}
+                onPageChange={(_, nextPage) => setPendingTodosPage(nextPage)}
+                rowsPerPage={pendingTodosRowsPerPage}
+                rowsPerPageOptions={[pendingTodosRowsPerPage]}
+                labelRowsPerPage=""
+              />
+            )}
+          </Paper>
+
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
             Últimos to-dos atribuídos
           </Typography>
           <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-            <TableContainer>
-              <Table size="small" stickyHeader>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%', minWidth: 520 }}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>TO-DO</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Origem</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atribuído em</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Prazo</TableCell>
-                    <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600 }}>XP</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '40%', minWidth: 140 }}>TO-DO</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '34%', minWidth: 100 }}>Origem</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 100, whiteSpace: 'nowrap' }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 96, whiteSpace: 'nowrap' }}>Prazo</TableCell>
+                    <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600, width: 48 }}>XP</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {recentTodos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                      <TableCell colSpan={5} align="center" sx={{ ...tableCellCompact, py: 2 }}>
                         <Typography variant="body2" color="text.secondary">
                           Nenhum to-do foi atribuído a você ainda.
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    recentTodos.map((todo: RecentAssignedTodo, idx: number) => (
-                      <TableRow key={todo.id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
+                    recentTodos.map((todo: RecentAssignedTodo, idx: number) => {
+                      const rowId = `recent-${todo.id}`
+                      return (
+                        <TableRow
+                          key={todo.id}
+                          hover
+                          onClick={() => handlePendingTodoClick(todo)}
+                          sx={{
+                            bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover',
+                            cursor: 'pointer',
+                            '&:hover .todo-link': { textDecoration: 'underline' },
+                          }}
+                        >
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <TodoTitleCell
+                              rowId={rowId}
+                              title={todo.title}
+                              expandedRows={expandedTodoRows}
+                              onToggle={toggleExpandedTodoRow}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              title={getTodoScopeLabel(todo)}
+                              sx={ellipsisOneLine}
+                            >
+                              {getTodoScopeLabel(todo)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', width: 100 }}>
+                            <TodoStatusChip completed={todo.completed} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                              {formatDate(todo.deadline)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography component="span" color="primary.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
+                              {todo.xpReward}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+          <Typography variant="subtitle1" fontWeight={600} color="text.primary" sx={{ mb: 1.5 }}>
+            Minhas atividades recentes
+          </Typography>
+          <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small" stickyHeader sx={{ tableLayout: 'auto', width: '100%', minWidth: 560 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 200 }}>Atividade</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 128, whiteSpace: 'nowrap' }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 104, whiteSpace: 'nowrap' }}>Prazo</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 112, whiteSpace: 'nowrap' }}>Atualizada em</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {recentActivities.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center" sx={{ ...tableCellCompact, py: 2 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Nenhuma atividade atribuída a você.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    recentActivities.map((activity, idx) => (
+                      <TableRow key={activity.id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
                         <TableCell sx={tableCellCompact}>
                           <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
-                            {todo.title}
+                            {activity.name}
                           </Typography>
                         </TableCell>
-                        <TableCell sx={tableCellCompact}>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }} noWrap>
-                            {getTodoScopeLabel(todo)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={tableCellCompact}>
-                          <TodoStatusChip completed={todo.completed} />
+                        <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle' }}>
+                          <StatusChip status={activity.status} />
                         </TableCell>
                         <TableCell sx={tableCellCompact}>
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
-                            {formatDate(todo.assignedAt)}
+                            {formatDate(activity.dueDate)}
                           </Typography>
                         </TableCell>
                         <TableCell sx={tableCellCompact}>
                           <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
-                            {formatDate(todo.deadline)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right" sx={tableCellCompact}>
-                          <Typography component="span" color="primary.main" fontWeight={600} sx={{ fontSize: '0.8125rem' }}>
-                            {todo.xpReward}
+                            {formatDate(activity.updatedAt)}
                           </Typography>
                         </TableCell>
                       </TableRow>
@@ -452,12 +863,12 @@ export default function Indicadores() {
         Por projeto
       </Typography>
       <Paper variant="outlined" sx={{ mb: 3, borderRadius: 2, overflow: 'hidden' }}>
-        <TableContainer>
-          <Table size="small" stickyHeader>
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table size="small" stickyHeader sx={{ tableLayout: 'auto', width: '100%', minWidth: 520 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
-                <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Projeto</TableCell>
-                <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 180 }}>Projeto</TableCell>
+                <TableCell sx={{ ...tableCellCompact, fontWeight: 600, minWidth: 128, whiteSpace: 'nowrap' }}>Status</TableCell>
                 <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600 }}>TO-DOs</TableCell>
                 <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600 }}>Concluídos</TableCell>
                 <TableCell align="right" sx={{ ...tableCellCompact, fontWeight: 600 }}>Coment.</TableCell>
@@ -480,7 +891,7 @@ export default function Indicadores() {
                         {p.project_name}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={tableCellCompact}>
+                    <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle' }}>
                       <StatusChip status={p.project_status} />
                     </TableCell>
                     <TableCell align="right" sx={tableCellCompact}>
@@ -528,14 +939,14 @@ export default function Indicadores() {
             Atividades
           </Typography>
           <Paper variant="outlined" sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
-            <TableContainer>
-              <Table size="small" stickyHeader>
+            <TableContainer sx={{ overflowX: 'auto' }}>
+              <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%', minWidth: 520 }}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'action.hover', '& .MuiTableCell-head': { borderBottom: '1px solid', borderColor: 'divider' } }}>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atividade</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Status</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Atribuído a</TableCell>
-                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600 }}>Prazo</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '36%', minWidth: 120 }}>Atividade</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 120, whiteSpace: 'nowrap' }}>Status</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: '28%', minWidth: 100 }}>Atribuído a</TableCell>
+                    <TableCell sx={{ ...tableCellCompact, fontWeight: 600, width: 104, whiteSpace: 'nowrap' }}>Prazo</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -548,28 +959,31 @@ export default function Indicadores() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    byActivity.map((a, idx) => (
-                      <TableRow key={a.activity_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
-                        <TableCell sx={tableCellCompact}>
-                          <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8125rem' }}>
-                            {a.activity_name}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={tableCellCompact}>
-                          <StatusChip status={a.status} />
-                        </TableCell>
-                        <TableCell sx={tableCellCompact}>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
-                            {a.assigned_to ? userNameById.get(a.assigned_to) ?? '—' : '—'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={tableCellCompact}>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
-                            {a.due_date ? new Date(a.due_date).toLocaleDateString('pt-BR') : '—'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    byActivity.map((a, idx) => {
+                      const assigneeLabel = a.assigned_to ? userNameById.get(a.assigned_to) ?? '—' : '—'
+                      return (
+                        <TableRow key={a.activity_id} hover sx={{ bgcolor: idx % 2 === 0 ? 'transparent' : 'action.hover' }}>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={500} title={a.activity_name} sx={ellipsisOneLine}>
+                              {a.activity_name}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle' }}>
+                            <StatusChip status={a.status} />
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', maxWidth: 0 }}>
+                            <Typography variant="body2" color="text.secondary" title={assigneeLabel} sx={ellipsisOneLine}>
+                              {assigneeLabel}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...tableCellCompact, verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8125rem' }}>
+                              {formatDatePtBr(a.due_date, '—')}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>

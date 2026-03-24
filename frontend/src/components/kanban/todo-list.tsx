@@ -1,4 +1,4 @@
-import { useState, useCallback, memo, useMemo } from 'react'
+import { useState, useEffect, useCallback, memo, useMemo } from 'react'
 import * as React from 'react'
 import {
   Box,
@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { fireTodoCompleteToast } from '@/components/achievements/TodoCompleteToast'
 import { useUsersList } from '@/hooks/use-users-list'
 import { useAchievements } from '@/hooks/use-achievements'
+import { formatDatePtBr, isOverdueDate } from '@/lib/date-only'
 import {
   DndContext,
   closestCenter,
@@ -56,6 +57,11 @@ type TodoMutationResponse = {
     error?: string
     code?: string
   } | null
+}
+
+type TodoDeleteResponse = {
+  xpDelta?: number | null
+  xpAction?: string | null
 }
 
 function isAwardedXpAction(action: string | null | undefined) {
@@ -192,11 +198,11 @@ const TodoItem = memo(function TodoItem({
 
   const deadlineChip = todo.deadline
     ? (() => {
-        const isOverdue = new Date(todo.deadline) < new Date() && !todo.completed
+        const isOverdue = isOverdueDate(todo.deadline) && !todo.completed
         return (
           <Chip
             size="small"
-            label={new Date(todo.deadline).toLocaleDateString('pt-BR')}
+            label={formatDatePtBr(todo.deadline, '—')}
             sx={{
               height: 18,
               fontSize: 10,
@@ -503,6 +509,10 @@ export function TodoList(props: TodoListProps) {
   const isAdmin = hasRole('admin')
 
   const visibleTodos = todos as TodoEntity[]
+  const orderedVisibleTodos = useMemo(() => {
+    if (isAdmin) return visibleTodos
+    return [...visibleTodos].sort((a, b) => Number(a.completed) - Number(b.completed))
+  }, [visibleTodos, isAdmin])
 
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [newTodoXp, setNewTodoXp] = useState(1)
@@ -512,6 +522,15 @@ export function TodoList(props: TodoListProps) {
   const [newTodoAssignee, setNewTodoAssignee] = useState<User | null>(null)
 
   const linkedAchievements = achievements.filter((a) => (a.mode ?? 'global_auto') === 'linked_item')
+
+  useEffect(() => {
+    const sampleWithDeadline = visibleTodos.find((todo) => Boolean(todo.deadline))
+    if (!sampleWithDeadline?.deadline) return
+    const parsed = new Date(sampleWithDeadline.deadline)
+    // #region agent log
+    fetch('http://127.0.0.1:7252/ingest/6d92a057-afdb-40f1-aa90-bc667d0d8da8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d3f9fe'},body:JSON.stringify({sessionId:'d3f9fe',runId:'post-fix',hypothesisId:'H9',location:'frontend/src/components/kanban/todo-list.tsx:523',message:'todo deadline render sample',data:{todoId:sampleWithDeadline.id,rawDeadline:sampleWithDeadline.deadline,parsedIso:parsed.toISOString(),formattedPtBr:formatDatePtBr(sampleWithDeadline.deadline,'—')},timestamp:Date.now()})}).catch(()=>{})
+    // #endregion
+  }, [visibleTodos])
 
   if (usersError) console.error('Erro ao carregar usuários:', usersError)
 
@@ -660,7 +679,12 @@ export function TodoList(props: TodoListProps) {
   const handleDelete = useCallback(
     async (id: string) => {
       try {
-        await deleteTodo(id)
+        const result = await deleteTodo(id) as TodoDeleteResponse
+        const xpDelta = Number(result?.xpDelta ?? 0)
+        if (isRevertedXpAction(result?.xpAction) && xpDelta !== 0) {
+          triggerXpDeduction(Math.abs(xpDelta), null)
+        }
+        window.dispatchEvent(new CustomEvent('cdt-activities-invalidated'))
       } catch (error) {
         console.error('Error deleting todo:', error)
       }
@@ -892,7 +916,7 @@ export function TodoList(props: TodoListProps) {
           {loading && (
             <LinearProgress sx={{ mb: 0.5, borderRadius: 1 }} color="primary" variant="indeterminate" />
           )}
-          {visibleTodos.map((todo) => (
+          {orderedVisibleTodos.map((todo) => (
             <TodoItem
               key={todo.id}
               todo={todo}

@@ -5,6 +5,8 @@ import { NotificationsDropdown } from '@/components/notifications/NotificationsD
 import { ViewAsUserButton } from './ViewAsUserButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { TodoCompleteToast } from '@/components/achievements/TodoCompleteToast'
+import { UserLevelProfileDrawer } from './UserLevelProfileDrawer'
+import { HeaderProfileButton } from './HeaderProfileButton'
 
 const HEADER_HEIGHT = 59
 
@@ -14,9 +16,10 @@ interface MainLayoutProps {
 
 function MainLayoutContent({ children }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const sidebarWidth = sidebarCollapsed ? 72 : 256
   const theme = useTheme()
-  const { isViewingAs, viewAsUser, stopViewingAs } = useAuth()
+  const { isViewingAs, viewAsUser, stopViewingAs, currentUser } = useAuth()
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -58,8 +61,17 @@ function MainLayoutContent({ children }: MainLayoutProps) {
             bgcolor: 'background.default',
           }}
         >
-          <ViewAsUserButton />
-          <NotificationsDropdown />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ViewAsUserButton />
+            <NotificationsDropdown />
+            {currentUser && (
+              <HeaderProfileButton
+                name={currentUser.name}
+                avatarUrl={currentUser.avatar_url}
+                onClick={() => setProfileDrawerOpen(true)}
+              />
+            )}
+          </Box>
         </Box>
         <Box
           sx={{
@@ -70,6 +82,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           {children}
         </Box>
       </Box>
+      <UserLevelProfileDrawer open={profileDrawerOpen} onClose={() => setProfileDrawerOpen(false)} />
     </Box>
   )
 }

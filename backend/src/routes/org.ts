@@ -331,6 +331,47 @@ router.get('/entry/:entryId/subtree', async (req, res) => {
   }
 });
 
+/** DELETE /api/org/entry/:entryId/subtree */
+router.delete('/entry/:entryId/subtree', async (req, res) => {
+  try {
+    const { entryId } = req.params;
+    const { data, error } = await supabase
+      .from('cdt_user_org')
+      .select('id, person_name, reports_to_id, job_title, display_order, department_id, monthly_salary, monthly_cost');
+    if (error) {
+      if (isMissingTable(error)) {
+        return res.status(503).json({ error: 'Migration required', code: 'MIGRATION_REQUIRED' });
+      }
+      throw error;
+    }
+
+    const rows = (data ?? []) as OrgRow[];
+    const rowMap = rowByIdMap(rows);
+    if (!rowMap.has(entryId)) {
+      return res.status(404).json({ error: 'Entrada não encontrada' });
+    }
+
+    const byParent = buildChildrenMap(rows);
+    const deleteIds = collectDescendantEntryIds(entryId, byParent);
+    if (deleteIds.length === 0) {
+      return res.status(404).json({ error: 'Nada para excluir' });
+    }
+
+    const { error: deleteError } = await supabase.from('cdt_user_org').delete().in('id', deleteIds);
+    if (deleteError) throw deleteError;
+
+    return res.json({
+      deletedCount: deleteIds.length,
+      deletedRootId: entryId,
+      deletedIds: deleteIds,
+    });
+  } catch (e: unknown) {
+    const err = e as Error;
+    console.error('org DELETE subtree:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete subtree' });
+  }
+});
+
 /** GET /api/org/entry/:entryId/summary */
 router.get('/entry/:entryId/summary', async (req, res) => {
   try {

@@ -1,40 +1,37 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, Role, Permission, UserWithRole } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { getApiBase } from '@/lib/api';
 import type { Session } from '@supabase/supabase-js';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+const API_URL = getApiBase();
 
-function isRefreshTokenError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return /refresh token|Refresh Token/i.test(msg);
-}
-
-interface AuthContextType {
+export type AuthContextType = {
   currentUser: User | null;
   userRole: Role | null;
   userPermissions: Permission[];
   isLoading: boolean;
   session: Session | null;
-  /** Login com email e senha via Supabase Auth */
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
   refreshUserData: () => Promise<void>;
-  /** Headers para requisicoes a API (Authorization Bearer + x-user-id) */
   getAuthHeaders: () => Record<string, string>;
-  /** Usuário real autenticado (nunca muda no modo visualização) */
   realUser: User | null;
   realUserRole: Role | null;
-  /** Modo "Ver como usuário" — apenas para administradores */
   isViewingAs: boolean;
   viewAsUser: UserWithRole | null;
   startViewingAs: (user: UserWithRole) => Promise<void>;
   stopViewingAs: () => void;
-}
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isRefreshTokenError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /refresh token|Refresh Token/i.test(msg);
+}
 
 type FetchUserResult =
   | { status: 'ok'; user: User; role: Role | null; permissions: Permission[] }
@@ -65,7 +62,10 @@ async function fetchUserWithRole(accessToken: string): Promise<FetchUserResult> 
     }
     return {
       status: 'unauthorized',
-      message: body?.error || 'Falha ao validar acesso do usuario.',
+      message:
+        typeof body?.error === 'string'
+          ? body.error
+          : `Falha ao validar acesso (HTTP ${res.status}). Verifique se o backend está no ar e se VITE_API_URL / proxy /api batem com a porta do servidor.`,
     };
   }
 
@@ -121,9 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const result = await fetchUserWithRole(s.access_token);
       if (result.status === 'ok') {
-        setCurrentUser(result.user);
-        setUserRole(result.role);
-        setUserPermissions(result.permissions);
+        const user = result.user;
+        const role = result.role;
+        const permissions = result.permissions;
+        setCurrentUser(user);
+        setUserRole(role);
+        setUserPermissions(permissions);
         return { ok: true };
       }
 
@@ -199,9 +202,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getAuthHeaders = useCallback((): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-    if (currentUser?.id) headers['x-user-id'] = currentUser.id;
+    const userIdForApi = viewAsUser?.id ?? currentUser?.id;
+    if (userIdForApi) headers['x-user-id'] = userIdForApi;
     return headers;
-  }, [session?.access_token, currentUser?.id]);
+  }, [session?.access_token, currentUser?.id, viewAsUser?.id]);
 
   const startViewingAs = useCallback(
     async (user: UserWithRole) => {
@@ -283,3 +287,4 @@ export function useAuth() {
   }
   return context;
 }
+

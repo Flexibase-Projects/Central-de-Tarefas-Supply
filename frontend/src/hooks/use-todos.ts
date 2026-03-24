@@ -34,6 +34,12 @@ type TodoMutationResponse = {
   xpAction?: string | null
 }
 
+type TodoDeleteResponse = {
+  success?: boolean
+  xpDelta?: number | null
+  xpAction?: string | null
+}
+
 const todosCache = new Map<string, TodoEntity[]>()
 const todosInFlight = new Map<string, Promise<TodoEntity[]>>()
 let activeTodosUserKey: string | null = null
@@ -358,7 +364,11 @@ export function useTodos(scope: TodosScope | null) {
         }
         const payload = await response.json()
         const newTodo = unwrapTodoMutation(payload).todo
-        setTodos((prev) => [...prev, newTodo])
+        setTodos((prev) => {
+          const next = [...prev, newTodo]
+          updateCachedTodos(scopeKey, () => next)
+          return next
+        })
         if (newTodo.project_id) invalidateTodosForProject(newTodo.project_id)
         if (newTodo.activity_id) invalidateTodosForActivity(newTodo.activity_id)
         return newTodo
@@ -368,7 +378,7 @@ export function useTodos(scope: TodosScope | null) {
       throw err
       }
     },
-    [getAuthHeaders]
+    [getAuthHeaders, scopeKey]
   )
 
   const updateTodo = useCallback(
@@ -443,6 +453,11 @@ export function useTodos(scope: TodosScope | null) {
 
   const deleteTodo = useCallback(
     async (id: string) => {
+      const previousTodos = todos
+      const nextTodos = previousTodos.filter((todo) => todo.id !== id)
+      setTodos(nextTodos)
+      updateCachedTodos(scopeKey, () => nextTodos)
+
       try {
         const url = API_URL ? `${API_URL}/api/todos/${id}` : `/api/todos/${id}`
         const response = await fetch(url, {
@@ -452,16 +467,28 @@ export function useTodos(scope: TodosScope | null) {
         if (!response.ok) {
           throw await getResponseError(response, 'Failed to delete todo')
         }
-        setTodos((prev) => prev.filter((todo) => todo.id !== id))
+
+        let payload: TodoDeleteResponse = { success: true, xpDelta: 0, xpAction: 'none' }
+        if (response.status !== 204) {
+          try {
+            payload = (await response.json()) as TodoDeleteResponse
+          } catch {
+            payload = { success: true, xpDelta: 0, xpAction: 'none' }
+          }
+        }
+
         if (projectId) invalidateTodosForProject(projectId)
         if (activityId) invalidateTodosForActivity(activityId)
+        return payload
       } catch (err) {
+        setTodos(previousTodos)
+        updateCachedTodos(scopeKey, () => previousTodos)
         const errorMessage = err instanceof Error ? err.message : 'Unknown error'
         setError(errorMessage)
         throw err
       }
     },
-    [getAuthHeaders, projectId, activityId]
+    [getAuthHeaders, projectId, activityId, todos, scopeKey]
   )
 
   const reorderTodos = useCallback(

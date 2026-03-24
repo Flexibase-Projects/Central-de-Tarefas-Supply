@@ -67,6 +67,7 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
 
   const isAdmin = hasRole('admin')
   const assignedCount = Math.max(0, Number(summary?.myAssignedOpenCount ?? 0))
+  const totalOpenCount = Math.max(0, Number(summary?.totalOpenCount ?? 0))
   const xpPendingCount = Math.max(0, Number(summary?.xpPendingCount ?? 0))
   const activeCount = Math.max(assignedCount, isAdmin ? xpPendingCount : 0)
   const focusTone = activeCount > 0
@@ -74,16 +75,6 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
     : '#64748B'
   const focusBg = isAdmin && xpPendingCount > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(37,99,235,0.08)'
   const focusBorder = isAdmin && xpPendingCount > 0 ? 'rgba(245,158,11,0.22)' : 'rgba(37,99,235,0.22)'
-  const summaryHint = isAdmin
-    ? xpPendingCount > 0
-      ? 'Defina XP e mantenha as entregas fluindo.'
-      : assignedCount > 0
-        ? 'Voce tambem tem demandas atribuidas aqui.'
-        : 'XP em dia.'
-    : assignedCount > 0
-      ? 'Abra o card e entregue no seu ritmo.'
-      : 'Tudo em dia.'
-
   const style = { transform: CSS.Transform.toString(transform), transition }
   const displayNumber = commitsCount !== null ? commitsCount : 0
   const stripeColor = STATUS_STRIPE[project.status] || STATUS_STRIPE.backlog
@@ -201,7 +192,22 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, mt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap', minWidth: 0 }}>
+            <Chip
+              size="small"
+              label={`Demandas totais: ${totalOpenCount}`}
+              sx={{
+                height: 20,
+                fontSize: 10,
+                fontWeight: 700,
+                bgcolor: totalOpenCount > 0 ? 'rgba(15,23,42,0.08)' : 'rgba(100,116,139,0.08)',
+                color: 'text.secondary',
+                border: '1px solid',
+                borderColor: totalOpenCount > 0 ? 'rgba(15,23,42,0.15)' : 'rgba(100,116,139,0.16)',
+                '& .MuiChip-label': { px: 0.75 },
+                maxWidth: 140,
+              }}
+            />
             <Chip
               size="small"
               label={`Suas demandas: ${assignedCount}`}
@@ -214,45 +220,10 @@ export function KanbanCard({ project, onClick, summary }: KanbanCardProps) {
                 border: '1px solid',
                 borderColor: assignedCount > 0 ? 'rgba(37,99,235,0.22)' : 'rgba(100,116,139,0.16)',
                 '& .MuiChip-label': { px: 0.75 },
+                display: assignedCount > 0 ? 'inline-flex' : 'none',
+                maxWidth: 130,
               }}
             />
-            {isAdmin && (
-              <Chip
-                size="small"
-                label={`XP pendente: ${xpPendingCount}`}
-                sx={{
-                  height: 20,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  bgcolor: xpPendingCount > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(100,116,139,0.08)',
-                  color: xpPendingCount > 0 ? '#B45309' : '#64748B',
-                  border: '1px solid',
-                  borderColor: xpPendingCount > 0 ? 'rgba(245,158,11,0.22)' : 'rgba(100,116,139,0.16)',
-                  '& .MuiChip-label': { px: 0.75 },
-                }}
-              />
-            )}
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11, lineHeight: 1.3 }}>
-              {summaryHint}
-            </Typography>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-            {activeCount > 0 && (
-              <Box
-                sx={{
-                  px: 0.75,
-                  py: 0.3,
-                  borderRadius: 999,
-                  bgcolor: activeCount > 0 ? focusBg : 'rgba(100,116,139,0.08)',
-                  color: focusTone,
-                  fontSize: 10,
-                  fontWeight: 700,
-                }}
-              >
-                {activeCount > 0 ? 'Destaque ativo' : 'Sem pendências'}
-              </Box>
-            )}
           </Box>
         </Box>
       </CardContent>
