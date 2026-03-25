@@ -13,8 +13,7 @@ import { useSearchParams } from 'react-router-dom'
 
 export default function Desenvolvimentos() {
   const { projects, loading, createProject, updateProject, moveProject, deleteProject } = useProjects()
-  const { hasRole } = usePermissions()
-  const isAdmin = hasRole('admin')
+  const { hasPermission } = usePermissions()
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
@@ -99,8 +98,23 @@ export default function Desenvolvimentos() {
 
   return (
     <ProtectedRoute permission="access_desenvolvimentos">
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-        <Box sx={{ flex: 1, overflow: 'hidden', px: 3, pt: 2, pb: 3 }}>
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+        <Box sx={{ flexShrink: 0, px: 3, pt: 2.5, pb: 1.5 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 700,
+              color: 'text.primary',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Projetos
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            Kanban de projetos da equipe — arraste os cards entre as colunas e abra um card para ver detalhes, to-dos e comentários.
+          </Typography>
+        </Box>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', px: 3, pt: 0.5, pb: 3 }}>
           <KanbanBoard
             projects={projects}
             onProjectMove={handleProjectMove}
@@ -130,7 +144,7 @@ export default function Desenvolvimentos() {
           open={isProjectDialogOpen}
           onOpenChange={setIsProjectDialogOpen}
           onUpdate={handleUpdateProject}
-          onDelete={isAdmin ? handleDeleteProject : undefined}
+          onDelete={hasPermission('manage_projects') ? handleDeleteProject : undefined}
           highlightedTodoId={highlightedTodoId}
         />
       </Box>

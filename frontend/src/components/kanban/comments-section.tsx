@@ -4,6 +4,8 @@ import { Send, Trash2 } from '@/components/ui/icons'
 import { Comment } from '@/types'
 import { useProjectComments, type CommentsScope } from '@/hooks/use-project-comments'
 import { useAuth } from '@/contexts/AuthContext'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext'
 import { formatDistanceToNow } from 'date-fns'
 import { TierBadge } from '@/components/gamification/TierBadge'
 
@@ -14,9 +16,11 @@ type CommentsSectionProps =
 interface CommentItemProps {
   comment: Comment
   onDelete: (id: string) => void
+  gamificationEnabled: boolean
+  canDelete: boolean
 }
 
-function CommentItem({ comment, onDelete }: CommentItemProps) {
+function CommentItem({ comment, onDelete, gamificationEnabled, canDelete }: CommentItemProps) {
   return (
     <Box
       sx={{
@@ -35,7 +39,7 @@ function CommentItem({ comment, onDelete }: CommentItemProps) {
           <Typography variant="body2" fontWeight={500}>
             {comment.author_name || 'Usuário Anônimo'}
           </Typography>
-          {comment.author_level != null && comment.author_level > 0 && (
+          {gamificationEnabled && comment.author_level != null && comment.author_level > 0 && (
             <TierBadge level={comment.author_level} size="xs" />
           )}
           <Typography variant="caption" color="text.secondary">
@@ -46,9 +50,11 @@ function CommentItem({ comment, onDelete }: CommentItemProps) {
           {comment.content}
         </Typography>
       </Box>
-      <IconButton size="small" onClick={() => onDelete(comment.id)}>
-        <Trash2 size={16} />
-      </IconButton>
+      {canDelete && (
+        <IconButton size="small" onClick={() => onDelete(comment.id)}>
+          <Trash2 size={16} />
+        </IconButton>
+      )}
     </Box>
   )
 }
@@ -63,6 +69,10 @@ export function CommentsSection(props: CommentsSectionProps) {
   }, [activityId, projectId])
   const { comments, loading, createComment, deleteComment } = useProjectComments(scope)
   const { currentUser } = useAuth()
+  const { hasPermission } = usePermissions()
+  const { gamificationEnabled } = useFeatureFlags()
+  const canInteract =
+    projectId != null ? hasPermission('manage_tasks') : hasPermission('manage_activities')
   const [newComment, setNewComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -95,29 +105,31 @@ export function CommentsSection(props: CommentsSectionProps) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       {loading && comments.length === 0 && <LinearProgress sx={{ borderRadius: 1 }} />}
-      <Box>
-        <TextField
-          multiline
-          minRows={3}
-          fullWidth
-          size="small"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Escreva um comentário..."
-          sx={{ mb: 1 }}
-        />
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            variant="contained"
+      {canInteract && (
+        <Box>
+          <TextField
+            multiline
+            minRows={3}
+            fullWidth
             size="small"
-            onClick={handleSubmit}
-            disabled={!newComment.trim() || isSubmitting}
-            startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <Send />}
-          >
-            {isSubmitting ? 'Enviando...' : 'Enviar'}
-          </Button>
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Escreva um comentário..."
+            sx={{ mb: 1 }}
+          />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={handleSubmit}
+              disabled={!newComment.trim() || isSubmitting}
+              startIcon={isSubmitting ? <CircularProgress size={16} color="inherit" /> : <Send />}
+            >
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
+            </Button>
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {loading && comments.length === 0 ? (
         <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 2 }}>
@@ -130,7 +142,13 @@ export function CommentsSection(props: CommentsSectionProps) {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 400, overflowY: 'auto' }}>
           {comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} onDelete={handleDelete} />
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              onDelete={handleDelete}
+              gamificationEnabled={gamificationEnabled}
+              canDelete={canInteract}
+            />
           ))}
         </Box>
       )}

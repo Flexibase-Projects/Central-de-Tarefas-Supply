@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { Box, Tabs, Tab, Typography } from '@mui/material'
-import { People, Security, Key, Trophy } from '@/components/ui/icons'
+import { People, Security, Key, Trophy, Settings } from '@/components/ui/icons'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { UsersTable } from '@/components/admin/users-table'
 import { RolesTable } from '@/components/admin/roles-table'
 import { PermissionsList } from '@/components/admin/permissions-list'
 import { AchievementsAdminTable } from '@/components/admin/achievements-table'
+import { FeatureFlagsSettings } from '@/components/admin/feature-flags-settings'
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext'
 
-type AdminTab = 'users' | 'roles' | 'permissions' | 'achievements'
+type AdminTab = 'users' | 'roles' | 'permissions' | 'features' | 'achievements'
 
 export default function Administracao() {
   const [activeTab, setActiveTab] = useState<AdminTab>('users')
+  const { gamificationEnabled } = useFeatureFlags()
 
   return (
     <ProtectedRoute role="admin">
@@ -29,18 +32,22 @@ export default function Administracao() {
           <Tab value="users" label="Usuários" icon={<People />} iconPosition="start" />
           <Tab value="roles" label="Cargos" icon={<Security />} iconPosition="start" />
           <Tab value="permissions" label="Permissões" icon={<Key />} iconPosition="start" />
-          <Tab
-            value="achievements"
-            label="Conquistas"
-            icon={<Trophy style={{ color: '#F59E0B' }} />}
-            iconPosition="start"
-          />
+          <Tab value="features" label="Funcionalidades" icon={<Settings />} iconPosition="start" />
+          {gamificationEnabled && (
+            <Tab
+              value="achievements"
+              label="Conquistas"
+              icon={<Trophy style={{ color: '#F59E0B' }} />}
+              iconPosition="start"
+            />
+          )}
         </Tabs>
 
         <Box sx={{ pt: 2 }}>
           {activeTab === 'users' && <UsersTable />}
           {activeTab === 'roles' && <RolesTable />}
           {activeTab === 'permissions' && <PermissionsList />}
+          {activeTab === 'features' && <FeatureFlagsSettings />}
           {activeTab === 'achievements' && <AchievementsAdminTable />}
         </Box>
       </Box>

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Box, CircularProgress, Typography } from '@mui/material'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Box, CircularProgress, Typography, useTheme } from '@mui/material'
 import { useTeamCanvas } from '@/hooks/use-team-canvas'
+import { useThemeMode } from '@/theme/ThemeProvider'
 import '@excalidraw/excalidraw/index.css'
 
 export default function CanvaEquipe() {
@@ -9,7 +10,9 @@ export default function CanvaEquipe() {
     import('@excalidraw/excalidraw').then((mod) => setExcalidrawComponent(() => mod.Excalidraw))
   }, [])
   const { data, loading, saving, error, saveContent } = useTeamCanvas()
-  const theme = 'light'
+  const { mode } = useThemeMode()
+  const excalidrawTheme = mode === 'dark' ? 'dark' : 'light'
+  const muiTheme = useTheme()
 
   const handleChange = useCallback(
     (elements: readonly unknown[], appState: Record<string, unknown>) => {
@@ -21,24 +24,20 @@ export default function CanvaEquipe() {
     [saveContent]
   )
 
-  const initialData = data?.content && typeof data.content === 'object'
-    ? (() => {
-        const content = data.content as { elements?: unknown[]; appState?: Record<string, unknown> }
-        const rawAppState = content.appState ?? {}
-        // Excalidraw espera appState.collaborators como array; ao carregar do backend pode vir como objeto ou undefined
-        const appState = {
-          ...rawAppState,
-          theme: 'light',
-          collaborators: Array.isArray(rawAppState.collaborators)
-            ? rawAppState.collaborators
-            : [],
-        }
-        return {
-          elements: Array.isArray(content.elements) ? content.elements : [],
-          appState,
-        }
-      })()
-    : undefined
+  const initialData = useMemo(() => {
+    if (!data?.content || typeof data.content !== 'object') return undefined
+    const content = data.content as { elements?: unknown[]; appState?: Record<string, unknown> }
+    const rawAppState = content.appState ?? {}
+    const appState = {
+      ...rawAppState,
+      theme: excalidrawTheme,
+      collaborators: Array.isArray(rawAppState.collaborators) ? rawAppState.collaborators : [],
+    }
+    return {
+      elements: Array.isArray(content.elements) ? content.elements : [],
+      appState,
+    }
+  }, [data?.content, excalidrawTheme])
 
   if (!ExcalidrawComponent) {
     return (
@@ -67,6 +66,7 @@ export default function CanvaEquipe() {
         flexDirection: 'column',
         overflow: 'hidden',
         position: 'relative',
+        bgcolor: muiTheme.palette.background.default,
       }}
     >
       {saving && (
@@ -94,9 +94,10 @@ export default function CanvaEquipe() {
       )}
       <Box sx={{ flex: 1, minHeight: 0 }}>
         <ExcalidrawComponent
+          key={excalidrawTheme}
           initialData={initialData}
           onChange={handleChange}
-          theme={theme}
+          theme={excalidrawTheme}
         />
       </Box>
     </Box>

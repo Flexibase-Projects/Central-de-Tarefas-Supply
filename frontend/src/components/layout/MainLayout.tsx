@@ -10,6 +10,7 @@ import { TodoCompleteToast } from '@/components/achievements/TodoCompleteToast'
 import { UserLevelProfileDrawer } from './UserLevelProfileDrawer'
 import { HeaderProfileButton } from './HeaderProfileButton'
 import { HeaderCollapsedSidebarTools } from './HeaderCollapsedSidebarTools'
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext'
 
 const HEADER_HEIGHT = 59
 
@@ -23,7 +24,8 @@ function MainLayoutContent({ children }: MainLayoutProps) {
   const sidebarWidth = sidebarCollapsed ? 72 : 256
   const theme = useTheme()
   const { isViewingAs, viewAsUser, stopViewingAs, currentUser } = useAuth()
-  const { data: progressData, loading: progressLoading } = useUserProgress()
+  const { gamificationEnabled } = useFeatureFlags()
+  const { data: progressData, loading: progressLoading } = useUserProgress(gamificationEnabled)
   const { count: pendingTodosCount } = useMyPendingTodosCount()
 
   return (
@@ -34,6 +36,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
         pendingTodosCount={pendingTodosCount}
         progressData={progressData}
         progressLoading={progressLoading}
+        gamificationEnabled={gamificationEnabled}
       />
       <Box
         component="main"
@@ -89,6 +92,7 @@ function MainLayoutContent({ children }: MainLayoutProps) {
                 pendingTodosCount={pendingTodosCount}
                 progressData={progressData}
                 progressLoading={progressLoading}
+                gamificationEnabled={gamificationEnabled}
               />
             ) : null}
           </Box>
@@ -113,16 +117,22 @@ function MainLayoutContent({ children }: MainLayoutProps) {
           {children}
         </Box>
       </Box>
-      <UserLevelProfileDrawer open={profileDrawerOpen} onClose={() => setProfileDrawerOpen(false)} />
+      <UserLevelProfileDrawer
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        gamificationEnabled={gamificationEnabled}
+      />
     </Box>
   )
 }
 
 export default function MainLayout({ children }: MainLayoutProps) {
+  const { gamificationEnabled } = useFeatureFlags()
+
   return (
     <>
       <MainLayoutContent>{children}</MainLayoutContent>
-      <TodoCompleteToast />
+      {gamificationEnabled ? <TodoCompleteToast /> : null}
     </>
   )
 }

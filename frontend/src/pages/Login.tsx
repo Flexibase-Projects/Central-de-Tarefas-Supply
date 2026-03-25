@@ -394,7 +394,7 @@ export default function Login() {
           }}
         >
           <Typography variant="h4" fontWeight={700} sx={{ mb: 1, letterSpacing: '-0.02em' }}>
-            Central de Tarefas
+            Central de Tarefas - Supply
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.75, mb: 2 }}>
             Plataforma para organizar o trabalho do time de desenvolvimento com clareza de prioridade,
@@ -545,7 +545,7 @@ export default function Login() {
               lineHeight: 1.2,
             }}
           >
-            Central de Tarefas
+            Central de Tarefas - Supply
           </Typography>
           <Typography
             variant="body1"

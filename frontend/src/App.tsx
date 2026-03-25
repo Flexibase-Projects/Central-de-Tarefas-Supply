@@ -4,8 +4,11 @@ import { Box, CircularProgress } from '@mui/material'
 import { AuthProvider } from './contexts/AuthContext'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+
+const insightFallback = <Navigate to="/desenvolvimentos" replace />
 import MainLayout from './components/layout/MainLayout'
 import Login from './pages/Login'
+import { FeatureFlagsProvider, useFeatureFlags } from './contexts/FeatureFlagsContext'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Desenvolvimentos = lazy(() => import('./pages/Desenvolvimentos'))
@@ -41,53 +44,101 @@ function AppRouteFallback() {
   )
 }
 
+function AppRoutes() {
+  const { gamificationEnabled } = useFeatureFlags()
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/*"
+          element={
+            <AuthGuard>
+              <MainLayout>
+                <Suspense fallback={<AppRouteFallback />}>
+                  <Routes>
+                    <Route
+                      path="/"
+                      element={
+                        <ProtectedRoute permission="access_insight" fallback={insightFallback}>
+                          <Dashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/mapa"
+                      element={
+                        <ProtectedRoute permission="access_insight" fallback={insightFallback}>
+                          <Mapa />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/prioridades"
+                      element={
+                        <ProtectedRoute permission="access_insight" fallback={insightFallback}>
+                          <Prioridades />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/desenvolvimentos" element={<Desenvolvimentos />} />
+                    <Route path="/atividades" element={<Atividades />} />
+                    <Route path="/canva-equipe" element={<CanvaEquipe />} />
+                    <Route
+                      path="/indicadores"
+                      element={
+                        <ProtectedRoute permission="access_insight" fallback={insightFallback}>
+                          <Indicadores />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/perfil" element={<Perfil />} />
+                    {gamificationEnabled ? (
+                      <>
+                        <Route path="/conquistas" element={<Conquistas />} />
+                        <Route path="/niveis" element={<Niveis />} />
+                        <Route path="/tutorial" element={<Tutorial />} />
+                      </>
+                    ) : (
+                      <>
+                        <Route path="/conquistas" element={<Navigate to="/perfil" replace />} />
+                        <Route path="/niveis" element={<Navigate to="/perfil" replace />} />
+                        <Route path="/tutorial" element={<Navigate to="/perfil" replace />} />
+                      </>
+                    )}
+                    <Route path="/organograma" element={<ProtectedRoute role="admin"><Organograma /></ProtectedRoute>} />
+                    <Route path="/custos-departamento" element={<ProtectedRoute role="admin"><CustosDepartamento /></ProtectedRoute>} />
+                    <Route path="/configuracoes/organograma" element={<Navigate to="/organograma" replace />} />
+                    <Route
+                      path="/configuracoes/custos-departamento"
+                      element={<Navigate to="/custos-departamento" replace />}
+                    />
+                    <Route
+                      path="/configuracoes"
+                      element={<ProtectedRoute role="admin"><ConfiguracoesLayout /></ProtectedRoute>}
+                    >
+                      <Route index element={<ConfiguracoesHub />} />
+                      <Route path="administracao" element={<Administracao />} />
+                    </Route>
+                    <Route path="/admin" element={<Navigate to="/configuracoes/administracao" replace />} />
+                  </Routes>
+                </Suspense>
+              </MainLayout>
+            </AuthGuard>
+          }
+        />
+      </Routes>
+    </Router>
+  )
+}
+
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/*"
-            element={
-              <AuthGuard>
-                <MainLayout>
-                  <Suspense fallback={<AppRouteFallback />}>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/mapa" element={<Mapa />} />
-                      <Route path="/prioridades" element={<Prioridades />} />
-                      <Route path="/desenvolvimentos" element={<Desenvolvimentos />} />
-                      <Route path="/atividades" element={<Atividades />} />
-                      <Route path="/canva-equipe" element={<CanvaEquipe />} />
-                      <Route path="/indicadores" element={<Indicadores />} />
-                      <Route path="/perfil" element={<Perfil />} />
-                      <Route path="/conquistas" element={<Conquistas />} />
-                      <Route path="/niveis" element={<Niveis />} />
-                      <Route path="/tutorial" element={<Tutorial />} />
-                      <Route path="/organograma" element={<ProtectedRoute role="admin"><Organograma /></ProtectedRoute>} />
-                      <Route path="/custos-departamento" element={<ProtectedRoute role="admin"><CustosDepartamento /></ProtectedRoute>} />
-                      <Route path="/configuracoes/organograma" element={<Navigate to="/organograma" replace />} />
-                      <Route
-                        path="/configuracoes/custos-departamento"
-                        element={<Navigate to="/custos-departamento" replace />}
-                      />
-                      <Route
-                        path="/configuracoes"
-                        element={<ProtectedRoute role="admin"><ConfiguracoesLayout /></ProtectedRoute>}
-                      >
-                        <Route index element={<ConfiguracoesHub />} />
-                        <Route path="administracao" element={<Administracao />} />
-                      </Route>
-                      <Route path="/admin" element={<Navigate to="/configuracoes/administracao" replace />} />
-                    </Routes>
-                  </Suspense>
-                </MainLayout>
-              </AuthGuard>
-            }
-          />
-        </Routes>
-      </Router>
+      <FeatureFlagsProvider>
+        <AppRoutes />
+      </FeatureFlagsProvider>
     </AuthProvider>
   )
 }

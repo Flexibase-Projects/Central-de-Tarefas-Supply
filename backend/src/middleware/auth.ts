@@ -58,6 +58,12 @@ export async function authMiddleware(
     } = await supabase.auth.getUser(token);
 
     if (error || !user) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(
+          '[auth] JWT inválido ou Supabase inacessível:',
+          error?.message || (user ? '' : 'sem usuário'),
+        );
+      }
       next();
       return;
     }
@@ -129,8 +135,11 @@ export async function authMiddleware(
       authReq.effectiveUserId = effectiveUserId;
       req.headers['x-user-id'] = effectiveUserId;
     }
-  } catch {
-    // Ignore auth errors and continue as unauthenticated for app-level handling.
+  } catch (err: unknown) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[auth] exceção ao validar sessão:', err instanceof Error ? err.message : err);
+    }
+    // Continua sem usuário; /api/users/me responderá 401.
   }
 
   next();

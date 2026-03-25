@@ -17,4 +17,4 @@ export function isSupabaseConnectionRefused(error: unknown): boolean {
 }
 
 export const SUPABASE_UNAVAILABLE_MESSAGE =
-  'Supabase indisponível (127.0.0.1:54321). Inicie o Supabase local com "supabase start" ou use a URL do projeto em nuvem no .env.local.';
+  'Supabase indisponível: o backend não conseguiu conectar em SUPABASE_URL. Verifique se a URL/porta estão corretas, firewall/rede liberados e se o stack GoTrue/PostgREST está no ar.';

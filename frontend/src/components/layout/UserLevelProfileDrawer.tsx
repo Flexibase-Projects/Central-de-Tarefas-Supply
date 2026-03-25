@@ -92,14 +92,15 @@ function StatTile({
 export interface UserLevelProfileDrawerProps {
   open: boolean
   onClose: () => void
+  gamificationEnabled: boolean
 }
 
-export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawerProps) {
+export function UserLevelProfileDrawer({ open, onClose, gamificationEnabled }: UserLevelProfileDrawerProps) {
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
   const { currentUser } = useAuth()
   const { goPerfil, goIndicadores, handleLogout } = useProfileDrawerActions({ onClose })
-  const { data: progress, loading: progressLoading } = useUserProgress()
+  const { data: progress, loading: progressLoading } = useUserProgress(gamificationEnabled)
   const { data: indicators, loading: indicatorsLoading, error: indicatorsError } = useIndicators()
 
   const tier = progress ? getTierForLevel(progress.level) : getTierForLevel(1)
@@ -193,55 +194,65 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
             >
               {currentUser.email}
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-              <TierBadge level={progress?.level ?? 1} size="sm" showTierName />
-            </Box>
+            {gamificationEnabled ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <TierBadge level={progress?.level ?? 1} size="sm" showTierName />
+              </Box>
+            ) : (
+              <Typography variant="caption" color={isLight ? 'text.secondary' : 'rgba(255,255,255,0.7)'}>
+                Supply Chain
+              </Typography>
+            )}
           </Box>
 
-          <Box
-            sx={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: `linear-gradient(145deg, ${tier.color}dd, ${tier.color}88)`,
-              border: '2px solid',
-              borderColor: isLight ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.2)',
-              boxShadow: `0 0 16px ${tier.glowColor}`,
-            }}
-          >
-            <Typography variant="h5" fontWeight={900} sx={{ color: '#fff', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
-              {progress?.level ?? 1}
-            </Typography>
-            <Typography sx={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: 0.5 }}>
-              LVL
-            </Typography>
-          </Box>
+          {gamificationEnabled ? (
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(145deg, ${tier.color}dd, ${tier.color}88)`,
+                border: '2px solid',
+                borderColor: isLight ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.2)',
+                boxShadow: `0 0 16px ${tier.glowColor}`,
+              }}
+            >
+              <Typography variant="h5" fontWeight={900} sx={{ color: '#fff', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+                {progress?.level ?? 1}
+              </Typography>
+              <Typography sx={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: 0.5 }}>
+                LVL
+              </Typography>
+            </Box>
+          ) : null}
         </Box>
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
-        <Typography
-          variant="overline"
-          sx={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: 1,
-            color: 'text.secondary',
-            display: 'block',
-            mb: 1,
-          }}
-        >
-          Progressão
-        </Typography>
+        {gamificationEnabled ? (
+          <Typography
+            variant="overline"
+            sx={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: 1,
+              color: 'text.secondary',
+              display: 'block',
+              mb: 1,
+            }}
+          >
+            Progressão
+          </Typography>
+        ) : null}
 
-        {progressLoading && !progress ? (
+        {gamificationEnabled && progressLoading && !progress ? (
           <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />
-        ) : progress ? (
+        ) : gamificationEnabled && progress ? (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="caption" color="text.secondary">
@@ -281,13 +292,13 @@ export function UserLevelProfileDrawer({ open, onClose }: UserLevelProfileDrawer
               </Typography>
             </Box>
           </>
-        ) : (
+        ) : gamificationEnabled ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Progresso indisponível no momento.
           </Typography>
-        )}
+        ) : null}
 
-        <Divider sx={{ my: 2, borderColor: isLight ? undefined : 'rgba(255,255,255,0.06)' }} />
+        {gamificationEnabled ? <Divider sx={{ my: 2, borderColor: isLight ? undefined : 'rgba(255,255,255,0.06)' }} /> : null}
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
           <Typography

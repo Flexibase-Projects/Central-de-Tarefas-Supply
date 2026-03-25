@@ -29,6 +29,8 @@ import {
 import { Activity } from '@/types'
 import { useAchievements } from '@/hooks/use-achievements'
 import { useTodos } from '@/hooks/use-todos'
+import { usePermissions } from '@/hooks/use-permissions'
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext'
 import { TodoList } from './todo-list'
 import { CommentsSection } from './comments-section'
 
@@ -79,10 +81,13 @@ export function ActivityCardDialog({
   onDelete,
   highlightedTodoId,
 }: ActivityCardDialogProps) {
+  const { gamificationEnabled } = useFeatureFlags()
+  const { hasPermission } = usePermissions()
+  const canEditActivity = hasPermission('manage_activities')
   const { achievements } = useAchievements()
-  const linkedAchievements = achievements.filter(
-    (a) => (a.mode ?? 'global_auto') === 'linked_item'
-  )
+  const linkedAchievements = gamificationEnabled
+    ? achievements.filter((a) => (a.mode ?? 'global_auto') === 'linked_item')
+    : []
 
   const [formData, setFormData] = useState({
     name: '',
@@ -340,7 +345,7 @@ export function ActivityCardDialog({
                       variant="subtitle2"
                       sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, fontWeight: 700 }}
                     >
-                      <Sparkles size={18} /> Resumo e gamificação
+                      <Sparkles size={18} /> {gamificationEnabled ? 'Resumo e gamificação' : 'Resumo'}
                     </Typography>
                     <Paper variant="outlined" sx={(t) => ({ ...sectionPaperSx(t) })}>
                       <Stack spacing={1.25}>
@@ -390,71 +395,73 @@ export function ActivityCardDialog({
                             </Typography>
                           </Box>
                         )}
-                        <Box
-                          sx={{
-                            mt: 0.5,
-                            pt: 1.25,
-                            borderTop: 1,
-                            borderColor: 'divider',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1,
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary" fontWeight={600}>
-                            Recompensa (gamificação)
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              Conclusão da atividade
+                        {gamificationEnabled && (
+                          <Box
+                            sx={{
+                              mt: 0.5,
+                              pt: 1.25,
+                              borderTop: 1,
+                              borderColor: 'divider',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 1,
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                              Recompensa (gamificação)
                             </Typography>
-                            <Chip
-                              size="small"
-                              label={`+${formatXpLabel(activityBaseXp)} XP`}
-                              color="secondary"
-                              variant="filled"
-                              sx={{ fontWeight: 700 }}
-                            />
-                            {(formData.deadline_bonus_percent ?? 0) > 0 && (
-                              <Chip
-                                size="small"
-                                label={`+${formData.deadline_bonus_percent}% bônus prazo`}
-                                variant="outlined"
-                              />
-                            )}
-                          </Box>
-                          {linkedTodoCount > 0 && (
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                               <Typography variant="caption" color="text.secondary">
-                                TO-DOs vinculados ({linkedTodoCount}) — soma base
+                                Conclusão da atividade
                               </Typography>
                               <Chip
                                 size="small"
-                                label={`+${formatXpLabel(todosXpPotential)} XP`}
-                                variant="outlined"
-                                sx={{ fontWeight: 600 }}
+                                label={`+${formatXpLabel(activityBaseXp)} XP`}
+                                color="secondary"
+                                variant="filled"
+                                sx={{ fontWeight: 700 }}
+                              />
+                              {(formData.deadline_bonus_percent ?? 0) > 0 && (
+                                <Chip
+                                  size="small"
+                                  label={`+${formData.deadline_bonus_percent}% bônus prazo`}
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+                            {linkedTodoCount > 0 && (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  TO-DOs vinculados ({linkedTodoCount}) — soma base
+                                </Typography>
+                                <Chip
+                                  size="small"
+                                  label={`+${formatXpLabel(todosXpPotential)} XP`}
+                                  variant="outlined"
+                                  sx={{ fontWeight: 600 }}
+                                />
+                              </Box>
+                            )}
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Total possível (atividade + TO-DOs)
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={`+${formatXpLabel(totalXpPotential)} XP`}
+                                color="primary"
+                                variant="filled"
+                                sx={{ fontWeight: 800 }}
                               />
                             </Box>
-                          )}
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                            <Typography variant="caption" color="text.secondary">
-                              Total possível (atividade + TO-DOs)
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
+                              Cada TO-DO concluído credita XP no perfil (como nos projetos). O valor acima soma a
+                              recompensa da atividade ao encerrar com a soma dos <strong>xp_reward</strong> dos
+                              TO-DOs vinculados; bônus de prazo e conquista vinculada entram no cálculo real ao
+                              concluir.
                             </Typography>
-                            <Chip
-                              size="small"
-                              label={`+${formatXpLabel(totalXpPotential)} XP`}
-                              color="primary"
-                              variant="filled"
-                              sx={{ fontWeight: 800 }}
-                            />
                           </Box>
-                          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
-                            Cada TO-DO concluído credita XP no perfil (como nos projetos). O valor acima soma a
-                            recompensa da atividade ao encerrar com a soma dos <strong>xp_reward</strong> dos
-                            TO-DOs vinculados; bônus de prazo e conquista vinculada entram no cálculo real ao
-                            concluir.
-                          </Typography>
-                        </Box>
+                        )}
                       </Stack>
                     </Paper>
                   </Box>
@@ -467,178 +474,192 @@ export function ActivityCardDialog({
                       <Settings size={18} /> Configurações
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.25 }}>
-                      Nome, descrição, prazo, XP e conquista vinculada
+                      {gamificationEnabled
+                        ? 'Nome, descrição, prazo, XP e conquista vinculada'
+                        : 'Nome, descrição, prazo e prioridade'}
                     </Typography>
                     <Paper variant="outlined" sx={(t) => ({ ...sectionPaperSx(t) })}>
-                      <form onSubmit={handleSaveSettings}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                          <TextField
-                            label="Nome"
-                            value={formData.name}
-                            onChange={(e) =>
-                              setFormData({ ...formData, name: e.target.value })
-                            }
-                            size="small"
-                            fullWidth
-                          />
-                          <TextField
-                            label="Descrição"
-                            value={formData.description}
-                            onChange={(e) =>
-                              setFormData({ ...formData, description: e.target.value })
-                            }
-                            size="small"
-                            fullWidth
-                            multiline
-                            minRows={2}
-                          />
-                          <FormControl size="small" fullWidth>
-                            <InputLabel>Status</InputLabel>
-                            <Select
-                              value={formData.status}
-                              label="Status"
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  status: e.target.value as Activity['status'],
-                                })
-                              }
-                            >
-                              {statusOptions.map((opt) => (
-                                <MenuItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <FormControl size="small" fullWidth>
-                            <InputLabel>Prioridade</InputLabel>
-                            <Select
-                              value={formData.priority}
-                              label="Prioridade"
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  priority: e.target.value as Activity['priority'],
-                                })
-                              }
-                            >
-                              {priorityOptions.map((opt) => (
-                                <MenuItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <TextField
-                            label="Vencimento"
-                            type="date"
-                            value={formData.due_date}
-                            onChange={(e) =>
-                              setFormData({ ...formData, due_date: e.target.value })
-                            }
-                            InputLabelProps={{ shrink: true }}
-                            size="small"
-                            fullWidth
-                          />
-                          <TextField
-                            label="XP"
-                            type="number"
-                            value={formData.xp_reward}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                xp_reward: Math.max(
-                                  0.01,
-                                  Math.min(1000, Number(e.target.value))
-                                ),
-                              })
-                            }
-                            inputProps={{ min: 0.01, max: 1000, step: 0.01 }}
-                            size="small"
-                            fullWidth
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <Typography
-                                    sx={{
-                                      fontSize: 11,
-                                      color: 'secondary.main',
-                                      fontWeight: 700,
+                      {canEditActivity ? (
+                        <>
+                          <form onSubmit={handleSaveSettings}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                              <TextField
+                                label="Nome"
+                                value={formData.name}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, name: e.target.value })
+                                }
+                                size="small"
+                                fullWidth
+                              />
+                              <TextField
+                                label="Descrição"
+                                value={formData.description}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, description: e.target.value })
+                                }
+                                size="small"
+                                fullWidth
+                                multiline
+                                minRows={2}
+                              />
+                              <FormControl size="small" fullWidth>
+                                <InputLabel>Status</InputLabel>
+                                <Select
+                                  value={formData.status}
+                                  label="Status"
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      status: e.target.value as Activity['status'],
+                                    })
+                                  }
+                                >
+                                  {statusOptions.map((opt) => (
+                                    <MenuItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <FormControl size="small" fullWidth>
+                                <InputLabel>Prioridade</InputLabel>
+                                <Select
+                                  value={formData.priority}
+                                  label="Prioridade"
+                                  onChange={(e) =>
+                                    setFormData({
+                                      ...formData,
+                                      priority: e.target.value as Activity['priority'],
+                                    })
+                                  }
+                                >
+                                  {priorityOptions.map((opt) => (
+                                    <MenuItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <TextField
+                                label="Vencimento"
+                                type="date"
+                                value={formData.due_date}
+                                onChange={(e) =>
+                                  setFormData({ ...formData, due_date: e.target.value })
+                                }
+                                InputLabelProps={{ shrink: true }}
+                                size="small"
+                                fullWidth
+                              />
+                              {gamificationEnabled && (
+                                <>
+                                  <TextField
+                                    label="XP"
+                                    type="number"
+                                    value={formData.xp_reward}
+                                    onChange={(e) =>
+                                      setFormData({
+                                        ...formData,
+                                        xp_reward: Math.max(
+                                          0.01,
+                                          Math.min(1000, Number(e.target.value))
+                                        ),
+                                      })
+                                    }
+                                    inputProps={{ min: 0.01, max: 1000, step: 0.01 }}
+                                    size="small"
+                                    fullWidth
+                                    InputProps={{
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Typography
+                                            sx={{
+                                              fontSize: 11,
+                                              color: 'secondary.main',
+                                              fontWeight: 700,
+                                            }}
+                                          >
+                                            +
+                                          </Typography>
+                                        </InputAdornment>
+                                      ),
                                     }}
-                                  >
-                                    +
-                                  </Typography>
-                                </InputAdornment>
-                              ),
-                            }}
-                          />
-                          <TextField
-                            label="% Bônus prazo"
-                            type="number"
-                            value={formData.deadline_bonus_percent}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                deadline_bonus_percent: Math.max(
-                                  0,
-                                  Math.min(500, Number(e.target.value))
-                                ),
-                              })
-                            }
-                            inputProps={{ min: 0, max: 500, step: 0.01 }}
-                            size="small"
-                            fullWidth
-                          />
-                          <FormControl size="small" fullWidth>
-                            <InputLabel>Conquista vinculada</InputLabel>
-                            <Select
-                              value={formData.achievement_id}
-                              label="Conquista vinculada"
-                              onChange={(e) =>
-                                setFormData({
-                                  ...formData,
-                                  achievement_id: String(e.target.value),
-                                })
-                              }
+                                  />
+                                  <TextField
+                                    label="% Bônus prazo"
+                                    type="number"
+                                    value={formData.deadline_bonus_percent}
+                                    onChange={(e) =>
+                                      setFormData({
+                                        ...formData,
+                                        deadline_bonus_percent: Math.max(
+                                          0,
+                                          Math.min(500, Number(e.target.value))
+                                        ),
+                                      })
+                                    }
+                                    inputProps={{ min: 0, max: 500, step: 0.01 }}
+                                    size="small"
+                                    fullWidth
+                                  />
+                                  <FormControl size="small" fullWidth>
+                                    <InputLabel>Conquista vinculada</InputLabel>
+                                    <Select
+                                      value={formData.achievement_id}
+                                      label="Conquista vinculada"
+                                      onChange={(e) =>
+                                        setFormData({
+                                          ...formData,
+                                          achievement_id: String(e.target.value),
+                                        })
+                                      }
+                                    >
+                                      <MenuItem value="">Nenhuma</MenuItem>
+                                      {linkedAchievements.map((achievement) => (
+                                        <MenuItem key={achievement.id} value={achievement.id}>
+                                          {achievement.name}
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                </>
+                              )}
+                              <Button
+                                type="submit"
+                                variant="contained"
+                                size="small"
+                                disabled={loading}
+                              >
+                                {loading ? 'Salvando...' : 'Salvar alterações'}
+                              </Button>
+                            </Box>
+                          </form>
+                          {onDelete && (
+                            <Box
+                              sx={{
+                                borderTop: 1,
+                                borderColor: 'divider',
+                                pt: 1.5,
+                                mt: 1.5,
+                              }}
                             >
-                              <MenuItem value="">Nenhuma</MenuItem>
-                              {linkedAchievements.map((achievement) => (
-                                <MenuItem key={achievement.id} value={achievement.id}>
-                                  {achievement.name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                          <Button
-                            type="submit"
-                            variant="contained"
-                            size="small"
-                            disabled={loading}
-                          >
-                            {loading ? 'Salvando...' : 'Salvar alterações'}
-                          </Button>
-                        </Box>
-                      </form>
-                      {onDelete && (
-                        <Box
-                          sx={{
-                            borderTop: 1,
-                            borderColor: 'divider',
-                            pt: 1.5,
-                            mt: 1.5,
-                          }}
-                        >
-                          <Button
-                            variant="outlined"
-                            color="error"
-                            size="small"
-                            onClick={() => setDeleteConfirmStep(1)}
-                            startIcon={<Trash2 size={20} />}
-                          >
-                            Excluir esta atividade
-                          </Button>
-                        </Box>
+                              <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
+                                onClick={() => setDeleteConfirmStep(1)}
+                                startIcon={<Trash2 size={20} />}
+                              >
+                                Excluir esta atividade
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                          Você não tem permissão para editar os dados desta atividade.
+                        </Typography>
                       )}
                     </Paper>
                   </Box>

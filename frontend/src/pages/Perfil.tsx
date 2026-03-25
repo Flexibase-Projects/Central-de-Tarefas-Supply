@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/icons'
 import type { UserProgressAchievement, Achievement } from '@/types'
 import { Link } from 'react-router-dom'
+import { useFeatureFlags } from '@/contexts/FeatureFlagsContext'
 
 // ── Icon map ───────────────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -235,6 +236,7 @@ function AchievementShowcaseCard({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Perfil() {
+  const { gamificationEnabled } = useFeatureFlags()
   const { currentUser } = useAuth()
   const { data: progress, loading: progressLoading } = useUserProgress()
   const { achievements: dbAchievements, loading: dbLoading } = useAchievements()
@@ -287,6 +289,49 @@ export default function Perfil() {
     return (
       <Box sx={{ p: 3 }}>
         <Typography color="text.secondary">Carregando...</Typography>
+      </Box>
+    )
+  }
+
+  if (!gamificationEnabled) {
+    return (
+      <Box sx={{ height: '100%', overflow: 'auto', p: 3 }}>
+        <Box sx={{ maxWidth: 720, mx: 'auto' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ mb: 3 }}>
+            Perfil
+          </Typography>
+          <Card variant="outlined">
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar
+                  sx={{
+                    width: 88,
+                    height: 88,
+                    bgcolor: isLight ? 'rgba(37,99,235,0.12)' : 'rgba(96,165,250,0.15)',
+                    color: 'primary.main',
+                    fontWeight: 700,
+                    fontSize: 34,
+                    flexShrink: 0,
+                  }}
+                  src={currentUser.avatar_url ?? undefined}
+                >
+                  {currentUser.name?.[0]?.toUpperCase() ?? <Person size={36} />}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h6" fontWeight={800} noWrap>
+                    {currentUser.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" noWrap>
+                    {currentUser.email}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Gamificação desativada para o Supply Chain.
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
     )
   }

@@ -31,7 +31,7 @@ import { useThemeMode } from '@/theme/ThemeProvider'
 import { usePermissions } from '@/hooks/use-permissions'
 import { LevelXpBar } from '@/components/master-mode/LevelXpBar'
 import { getTierForLevel } from '@/utils/tier'
-import { LEVEL_CARD_MENU_ITEMS } from '@/components/layout/sidebar-level-nav'
+import { getLevelCardMenuItems } from '@/components/layout/sidebar-level-nav'
 import type { UserProgress } from '@/types'
 
 type NavItem = { title: string; url: string; icon: React.ElementType; permission: string | null; requireRole?: string }
@@ -40,17 +40,17 @@ const SIDEBAR_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'INSIGHT',
     items: [
-      { title: 'Dashboard', url: '/', icon: Dashboard, permission: null },
-      { title: 'Mapa', url: '/mapa', icon: MapIcon, permission: null },
-      { title: 'Prioridades', url: '/prioridades', icon: Flag, permission: null },
-      { title: 'Indicadores', url: '/indicadores', icon: BarChart2, permission: null },
+      { title: 'Dashboard', url: '/', icon: Dashboard, permission: 'access_insight' },
+      { title: 'Mapa', url: '/mapa', icon: MapIcon, permission: 'access_insight' },
+      { title: 'Prioridades', url: '/prioridades', icon: Flag, permission: 'access_insight' },
+      { title: 'Indicadores', url: '/indicadores', icon: BarChart2, permission: 'access_insight' },
     ],
   },
   {
     title: 'FERRAMENTAS',
     items: [
-      { title: 'Desenvolvimentos', url: '/desenvolvimentos', icon: Code, permission: 'access_desenvolvimentos' },
-      { title: 'Atividades', url: '/atividades', icon: CheckSquare, permission: 'access_atividades' },
+      { title: 'Kanban — Projetos', url: '/desenvolvimentos', icon: Code, permission: 'access_desenvolvimentos' },
+      { title: 'Kanban — Atividades', url: '/atividades', icon: CheckSquare, permission: 'access_atividades' },
       { title: 'Canva em Equipe', url: '/canva-equipe', icon: Paintbrush, permission: null },
       { title: 'Organograma', url: '/organograma', icon: OrgChartIcon, permission: null, requireRole: 'admin' },
       { title: 'Custos', url: '/custos-departamento', icon: DollarSign, permission: null, requireRole: 'admin' },
@@ -68,6 +68,7 @@ interface AppSidebarProps {
   pendingTodosCount: number | null
   progressData: UserProgress | null
   progressLoading: boolean
+  gamificationEnabled: boolean
 }
 
 export function DemandCard({
@@ -296,7 +297,10 @@ export function AppSidebar(props: AppSidebarProps) {
     pendingTodosCount,
     progressData,
     progressLoading,
+    gamificationEnabled,
   } = props
+  const levelMenuItems = getLevelCardMenuItems(gamificationEnabled)
+
   const location = useLocation()
   const navigate = useNavigate()
   const theme = useTheme()
@@ -393,7 +397,7 @@ export function AppSidebar(props: AppSidebarProps) {
           }}
         >
           <Typography sx={{ fontSize: 14, fontWeight: 600, letterSpacing: 0.4, color: 'text.primary', lineHeight: 1.25 }}>
-            Central de Tarefas
+            SUPPLY
           </Typography>
           <Tooltip title="Recolher">
             <IconButton onClick={() => setIsCollapsed(true)} size="small" sx={{ ml: 'auto', mr: -0.5 }}>
@@ -561,7 +565,7 @@ export function AppSidebar(props: AppSidebarProps) {
           </Box>
         </Tooltip>
 
-        {!isCollapsed && (
+        {!isCollapsed && gamificationEnabled && (
           <>
             <Box
               component="button"
@@ -642,7 +646,7 @@ export function AppSidebar(props: AppSidebarProps) {
                 },
               }}
             >
-              {LEVEL_CARD_MENU_ITEMS.map((item) => {
+              {levelMenuItems.map((item) => {
                 const Icon = item.icon
                 const active = location.pathname === item.url
                 return (

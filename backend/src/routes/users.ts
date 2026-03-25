@@ -54,7 +54,7 @@ async function getUserRole(userId: string) {
     .select(
       `
       role_id,
-      cdt_roles (
+      supply_roles (
         id,
         name,
         display_name,
@@ -65,7 +65,7 @@ async function getUserRole(userId: string) {
     .eq('user_id', userId)
     .maybeSingle();
 
-  return data?.cdt_roles ?? null;
+  return data?.supply_roles ?? null;
 }
 
 async function assignRoleToUser(params: {

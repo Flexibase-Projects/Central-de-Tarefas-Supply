@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
           .from('supply_role_permissions')
           .select(`
             permission_id,
-            cdt_permissions (
+            supply_permissions (
               id,
               name,
               display_name,
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 
         return {
           ...role,
-          permissions: (permissions || []).map((p: any) => p.cdt_permissions).filter(Boolean),
+          permissions: (permissions || []).map((p: any) => p.supply_permissions).filter(Boolean),
         };
       })
     );
@@ -66,7 +66,7 @@ router.get('/:id', async (req, res) => {
       .from('supply_role_permissions')
       .select(`
         permission_id,
-        cdt_permissions (
+        supply_permissions (
           id,
           name,
           display_name,
@@ -78,7 +78,7 @@ router.get('/:id', async (req, res) => {
 
     res.json({
       ...role,
-      permissions: (permissions || []).map((p: any) => p.cdt_permissions).filter(Boolean),
+      permissions: (permissions || []).map((p: any) => p.supply_permissions).filter(Boolean),
     });
   } catch (error: any) {
     console.error('Error fetching role:', error);

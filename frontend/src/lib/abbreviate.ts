@@ -1,7 +1,7 @@
 /**
  * Gera abreviação do nome do projeto: primeiras letras de cada palavra
  * significativa (palavras com mais de 2 caracteres), até 3 letras.
- * Ex: "Central de Tarefas" -> "CT", "Projeto Alpha Beta" -> "PAB"
+ * Ex: "Central de Tarefas - Supply" -> "CTS", "Projeto Alpha Beta" -> "PAB"
  */
 export function abbreviateProjectName(name: string): string {
   const words = name
@@ -17,7 +17,7 @@ export function abbreviateProjectName(name: string): string {
  * - Nome completo se tiver ≤3 caracteres (ex: API, CDT).
  * - Se a abreviação ficar só 1 letra → 3 primeiras letras do nome (ex: Ferramentaria → FER).
  * - Se a primeira palavra tiver ≤3 caracteres → primeira palavra (ex: PDF TOOLS → PDF).
- * - Senão → abreviação normal (ex: Central de Tarefas → CT).
+ * - Senão → abreviação normal (ex: Central de Tarefas - Supply → CTS).
  */
 export function mapBubbleLabel(name: string): string {
   const trimmed = name.trim()

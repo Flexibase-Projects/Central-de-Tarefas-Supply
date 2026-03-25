@@ -75,44 +75,6 @@ export interface ProjectTodo {
   assigned_at?: string | null
 }
 
-export interface GitHubCommit {
-  sha: string
-  commit: {
-    message: string
-    author: {
-      name: string
-      email: string
-      date: string
-    }
-  }
-  author: {
-    login: string
-    avatar_url: string
-  } | null
-  html_url: string
-}
-
-export interface GitHubRepository {
-  id: number
-  name: string
-  full_name: string
-  description: string | null
-  html_url: string
-  language: string | null
-  stargazers_count: number
-  forks_count: number
-  open_issues_count: number
-  default_branch: string
-  updated_at: string
-  created_at: string
-  size: number
-  watchers_count: number
-  license: string | null
-  topics: string[]
-  archived: boolean
-  private: boolean
-}
-
 export interface Activity {
   id: string
   name: string

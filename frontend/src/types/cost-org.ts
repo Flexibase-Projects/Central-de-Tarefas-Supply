@@ -72,11 +72,27 @@ export type DepartmentMemberRow = {
   user: { id: string; name: string; email: string; avatar_url: string | null } | null
 }
 
+export type PunctualCostRow = {
+  id: string
+  department_id: string
+  title: string
+  description: string | null
+  amount: number
+  currency: string
+  reference_date: string
+  timing_kind?: 'punctual' | 'period'
+  period_start_date?: string | null
+  period_end_date?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type CostManagementGraph = {
   departments: Department[]
   departmentCosts: DepartmentCostLink[]
   members: DepartmentMemberRow[]
   costItems: CostItem[]
+  punctualCosts: PunctualCostRow[]
 }
 
 /** Foco no mapa de custos (destaque + drawer lateral) */

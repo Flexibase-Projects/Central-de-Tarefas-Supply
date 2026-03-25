@@ -10,8 +10,11 @@ import {
   Divider,
   FormControl,
   FormControlLabel,
+  FormLabel,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Stack,
   Switch,
@@ -26,7 +29,7 @@ import {
   Tooltip,
   Drawer,
 } from '@mui/material'
-import { DollarSign, Plus, RefreshCw, Link2, UserPlus, Building2, UserCircle, Pencil, X, Trash2 } from 'lucide-react'
+import { DollarSign, Plus, RefreshCw, Building2, Pencil, X, Trash2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import {
   CostTreeFlow,
@@ -36,9 +39,8 @@ import {
 } from '@/components/cost-management/CostTreeFlow'
 import { useCostGraph } from '@/hooks/use-cost-graph'
 import { useAuth } from '@/contexts/AuthContext'
-import { useUsersList } from '@/hooks/use-users-list'
 import { useOrgEntries, type OrgEntry } from '@/hooks/use-org'
-import type { CostCanvasFocus } from '@/types/cost-org'
+import type { CostCanvasFocus, PunctualCostRow } from '@/types/cost-org'
 import { CostCanvasDrawerPanel } from '@/components/cost-management/CostCanvasDrawerPanel'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
@@ -61,10 +63,32 @@ function numberToBrlField(value: number | string | null | undefined): string {
   return String(parsed).replace('.', ',')
 }
 
+/** Meses de calendário inclusivos (para rateio de custo por período). */
+function inclusiveMonthCount(isoStart: string, isoEnd: string): number {
+  const a = isoStart.slice(0, 10).split('-').map(Number)
+  const b = isoEnd.slice(0, 10).split('-').map(Number)
+  if (a.length < 3 || b.length < 3) return 0
+  const [ys, ms, ds] = a
+  const [ye, me, de] = b
+  const s = new Date(ys, ms - 1, ds)
+  const e = new Date(ye, me - 1, de)
+  if (e < s) return 0
+  return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1
+}
+
+function splitTotalAcrossMonths(total: number, months: number): number[] {
+  if (months <= 0 || !Number.isFinite(total)) return []
+  const cents = Math.round(total * 100)
+  const baseCents = Math.floor(cents / months)
+  const arr = Array.from({ length: months }, () => baseCents / 100)
+  const last = cents - baseCents * months
+  arr[months - 1] = Math.round((arr[months - 1] * 100 + last)) / 100
+  return arr
+}
+
 export default function CustosDepartamento() {
   const { getAuthHeaders } = useAuth()
   const { graph, loading, error, fetchGraph } = useCostGraph()
-  const { users, refreshUsers } = useUsersList()
   const { entries: orgEntries, fetchEntries, updateEntry } = useOrgEntries()
 
   const [canvasFocus, setCanvasFocus] = useState<CostCanvasFocus | null>(null)
@@ -84,25 +108,39 @@ export default function CustosDepartamento() {
   const [deptName, setDeptName] = useState('')
   const [deptDesc, setDeptDesc] = useState('')
 
-  const [costDialog, setCostDialog] = useState(false)
+  const [newCostDialogOpen, setNewCostDialogOpen] = useState(false)
+  const [ncIsFixed, setNcIsFixed] = useState(true)
+  const [ncVarKind, setNcVarKind] = useState<'punctual' | 'period'>('punctual')
   const [costName, setCostName] = useState('')
   const [costAmount, setCostAmount] = useState('0')
   const [costCategory, setCostCategory] = useState('ferramenta')
+  const [costDeptId, setCostDeptId] = useState('')
+  const [ncPeriodStart, setNcPeriodStart] = useState('')
+  const [ncPeriodEnd, setNcPeriodEnd] = useState('')
+  const [ncVarTitle, setNcVarTitle] = useState('')
+  const [ncVarDesc, setNcVarDesc] = useState('')
+  const [ncVarAmount, setNcVarAmount] = useState('0')
+  const [ncVarCurrency, setNcVarCurrency] = useState('BRL')
+  const [ncVarDate, setNcVarDate] = useState('')
 
   const [linkDialog, setLinkDialog] = useState(false)
   const [linkDeptId, setLinkDeptId] = useState('')
   const [linkCostId, setLinkCostId] = useState('')
 
-  const [memberDialog, setMemberDialog] = useState(false)
-  const [memDeptId, setMemDeptId] = useState('')
-  const [memUserId, setMemUserId] = useState('')
-  const [memCost, setMemCost] = useState('0')
+  const [punctualDialog, setPunctualDialog] = useState(false)
+  const [punctualEditId, setPunctualEditId] = useState<string | null>(null)
+  const [punctualDeptId, setPunctualDeptId] = useState('')
+  const [punctualTitle, setPunctualTitle] = useState('')
+  const [punctualDesc, setPunctualDesc] = useState('')
+  const [punctualAmount, setPunctualAmount] = useState('0')
+  const [punctualCurrency, setPunctualCurrency] = useState('BRL')
+  const [punctualDate, setPunctualDate] = useState('')
+  const [punctualTimingKind, setPunctualTimingKind] = useState<'punctual' | 'period'>('punctual')
+  const [punctualPeriodStart, setPunctualPeriodStart] = useState('')
+  const [punctualPeriodEnd, setPunctualPeriodEnd] = useState('')
 
   const [manageDialogOpen, setManageDialogOpen] = useState(false)
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [assignDeptId, setAssignDeptId] = useState('')
-  const [assignEntryId, setAssignEntryId] = useState('')
-  /** Opcional: ao criar departamento, já vincula esta entrada do organograma como responsável */
+  /** Obrigatório ao criar departamento: responsável no organograma (time derivado da hierarquia). */
   const [deptOrgEntryId, setDeptOrgEntryId] = useState('')
 
   const [formErr, setFormErr] = useState<string | null>(null)
@@ -203,6 +241,7 @@ export default function CustosDepartamento() {
     setCostDeletePreviewOpen(false)
     setCostDeleteConfirmOpen(false)
     setCostDeleteError(null)
+    setPunctualDialog(false)
   }, [])
 
   const costDeletePreviewRows = useMemo((): CostDeletePreviewRow[] => {
@@ -228,6 +267,18 @@ export default function CustosDepartamento() {
           key: `link-${l.cost_id}`,
           title: c?.name ?? 'Custo fixo',
           subtitle: 'Desvinculação — o cadastro do custo permanece no sistema',
+        })
+      }
+      const punctuals = (graph.punctualCosts ?? []).filter((p) => p.department_id === canvasFocus.departmentId)
+      for (const p of punctuals) {
+        const sub =
+          p.timing_kind === 'period' && p.period_start_date && p.period_end_date
+            ? `Custo por período (${p.period_start_date} → ${p.period_end_date}) — removido com o departamento`
+            : `Custo pontual (${new Date(p.reference_date + 'T12:00:00').toLocaleDateString('pt-BR')}) — removido com o departamento`
+        rows.push({
+          key: `punctual-${p.id}`,
+          title: p.title,
+          subtitle: sub,
         })
       }
       return rows
@@ -427,9 +478,45 @@ export default function CustosDepartamento() {
     }
   }
 
+  const resetNewCostForm = useCallback(() => {
+    setNcIsFixed(true)
+    setNcVarKind('punctual')
+    setCostName('')
+    setCostAmount(numberToBrlField(0))
+    setCostCategory('ferramenta')
+    setCostDeptId('')
+    setNcPeriodStart('')
+    setNcPeriodEnd('')
+    setNcVarTitle('')
+    setNcVarDesc('')
+    setNcVarAmount(numberToBrlField(0))
+    setNcVarCurrency('BRL')
+    setNcVarDate(new Date().toISOString().slice(0, 10))
+  }, [])
+
+  const openNewCostVariableForDept = useCallback(
+    (departmentId: string) => {
+      setFormErr(null)
+      resetNewCostForm()
+      setNcIsFixed(false)
+      setNcVarKind('punctual')
+      setCostDeptId(departmentId)
+      setNewCostDialogOpen(true)
+    },
+    [resetNewCostForm]
+  )
+
   const handleCreateDept = async () => {
     if (!deptName.trim()) {
       setFormErr('Informe o nome')
+      return
+    }
+    if (!deptOrgEntryId) {
+      setFormErr('Selecione o responsável do departamento no organograma')
+      return
+    }
+    if (orgEntries.length === 0) {
+      setFormErr('Cadastre pessoas em Organograma da Empresa antes de criar um departamento de custo')
       return
     }
     setSaving(true)
@@ -439,7 +526,7 @@ export default function CustosDepartamento() {
         name: deptName.trim(),
         description: deptDesc.trim() || null,
       })) as { id: string }
-      if (deptOrgEntryId && created?.id) {
+      if (created?.id) {
         await updateEntry(deptOrgEntryId, { department_id: created.id })
         await fetchEntries()
       }
@@ -460,29 +547,96 @@ export default function CustosDepartamento() {
     }
   }
 
-  const handleCreateCost = async () => {
-    if (!costName.trim()) {
-      setFormErr('Informe o nome do custo')
+  const handleSaveNewCost = async () => {
+    if (!costDeptId) {
+      setFormErr('Selecione o departamento')
       return
     }
     setSaving(true)
     setFormErr(null)
     try {
-      const created = (await postJson('/api/cost-items', {
-        name: costName.trim(),
-        amount: brlFieldToNumber(costAmount),
-        category: costCategory,
-        status: 'analise',
-        is_active: true,
-      })) as { id: string }
-      setCostDialog(false)
-      setCostName('')
-      setCostAmount('')
-      await fetchGraph()
-      const spawn = canvasSpawnRef.current
-      canvasSpawnRef.current = null
-      if (spawn && created?.id) {
-        setPendingNodePlacement({ nodeId: `cost-${created.id}`, x: spawn.x, y: spawn.y })
+      if (ncIsFixed) {
+        if (!costName.trim()) {
+          setFormErr('Informe o nome do custo')
+          setSaving(false)
+          return
+        }
+        const created = (await postJson('/api/cost-items', {
+          name: costName.trim(),
+          amount: brlFieldToNumber(costAmount),
+          category: costCategory,
+          status: 'analise',
+          is_active: true,
+        })) as { id: string }
+        await postJson(`/api/departments/${costDeptId}/costs`, { cost_id: created.id })
+        setNewCostDialogOpen(false)
+        resetNewCostForm()
+        await fetchGraph()
+        const spawn = canvasSpawnRef.current
+        canvasSpawnRef.current = null
+        if (spawn && created?.id) {
+          setPendingNodePlacement({ nodeId: `cost-${created.id}`, x: spawn.x, y: spawn.y })
+        }
+      } else if (ncVarKind === 'punctual') {
+        if (!ncVarTitle.trim()) {
+          setFormErr('Informe o título do custo')
+          setSaving(false)
+          return
+        }
+        if (!ncVarDate) {
+          setFormErr('Informe a data de referência')
+          setSaving(false)
+          return
+        }
+        await postJson('/api/cost-management/punctual-costs', {
+          department_id: costDeptId,
+          title: ncVarTitle.trim(),
+          description: ncVarDesc.trim() || null,
+          amount: brlFieldToNumber(ncVarAmount),
+          currency: ncVarCurrency,
+          reference_date: ncVarDate.slice(0, 10),
+          timing_kind: 'punctual',
+        })
+        setNewCostDialogOpen(false)
+        resetNewCostForm()
+        await fetchGraph()
+        canvasSpawnRef.current = null
+      } else {
+        if (!ncVarTitle.trim()) {
+          setFormErr('Informe o título do custo')
+          setSaving(false)
+          return
+        }
+        if (!ncPeriodStart || !ncPeriodEnd) {
+          setFormErr('Informe a data inicial e final do período')
+          setSaving(false)
+          return
+        }
+        if (ncPeriodEnd < ncPeriodStart) {
+          setFormErr('A data final deve ser igual ou posterior à inicial')
+          setSaving(false)
+          return
+        }
+        const months = inclusiveMonthCount(ncPeriodStart, ncPeriodEnd)
+        if (months <= 0) {
+          setFormErr('Período inválido')
+          setSaving(false)
+          return
+        }
+        await postJson('/api/cost-management/punctual-costs', {
+          department_id: costDeptId,
+          title: ncVarTitle.trim(),
+          description: ncVarDesc.trim() || null,
+          amount: brlFieldToNumber(ncVarAmount),
+          currency: ncVarCurrency,
+          timing_kind: 'period',
+          period_start_date: ncPeriodStart.slice(0, 10),
+          period_end_date: ncPeriodEnd.slice(0, 10),
+        })
+        setNewCostDialogOpen(false)
+        resetNewCostForm()
+        await fetchGraph()
+        canvasSpawnRef.current = null
       }
     } catch (e) {
       setFormErr((e as Error).message)
@@ -509,21 +663,69 @@ export default function CustosDepartamento() {
     }
   }
 
-  const handleMember = async () => {
-    if (!memDeptId || !memUserId) {
-      setFormErr('Preencha departamento e usuário')
+
+  const openPunctualDialogEdit = useCallback((row: PunctualCostRow) => {
+    const isPeriod = row.timing_kind === 'period'
+    setPunctualEditId(row.id)
+    setPunctualDeptId(row.department_id)
+    setPunctualTitle(row.title)
+    setPunctualDesc(row.description ?? '')
+    setPunctualAmount(numberToBrlField(Number(row.amount) || 0))
+    setPunctualCurrency(row.currency || 'BRL')
+    setPunctualTimingKind(isPeriod ? 'period' : 'punctual')
+    setPunctualDate(row.reference_date.slice(0, 10))
+    setPunctualPeriodStart((row.period_start_date ?? row.reference_date).slice(0, 10))
+    setPunctualPeriodEnd((row.period_end_date ?? row.period_start_date ?? '').slice(0, 10))
+    setFormErr(null)
+    setPunctualDialog(true)
+  }, [])
+
+  const handleSavePunctual = async () => {
+    if (!punctualEditId) return
+    if (!punctualTitle.trim()) {
+      setFormErr('Informe o título')
       return
+    }
+    if (punctualTimingKind === 'punctual' && !punctualDate) {
+      setFormErr('Informe a data de referência')
+      return
+    }
+    if (punctualTimingKind === 'period') {
+      if (!punctualPeriodStart || !punctualPeriodEnd) {
+        setFormErr('Informe o período (data inicial e final)')
+        return
+      }
+      if (punctualPeriodEnd < punctualPeriodStart) {
+        setFormErr('A data final deve ser igual ou posterior à inicial')
+        return
+      }
     }
     setSaving(true)
     setFormErr(null)
     try {
-      await postJson(`/api/departments/${memDeptId}/members`, {
-        user_id: memUserId,
-        individual_monthly_cost: brlFieldToNumber(memCost),
-      })
-      setMemberDialog(false)
+      if (punctualTimingKind === 'period') {
+        await patchJson(`/api/cost-management/punctual-costs/${punctualEditId}`, {
+          title: punctualTitle.trim(),
+          description: punctualDesc.trim() || null,
+          amount: brlFieldToNumber(punctualAmount),
+          currency: punctualCurrency,
+          timing_kind: 'period',
+          period_start_date: punctualPeriodStart.slice(0, 10),
+          period_end_date: punctualPeriodEnd.slice(0, 10),
+        })
+      } else {
+        await patchJson(`/api/cost-management/punctual-costs/${punctualEditId}`, {
+          title: punctualTitle.trim(),
+          description: punctualDesc.trim() || null,
+          amount: brlFieldToNumber(punctualAmount),
+          currency: punctualCurrency,
+          timing_kind: 'punctual',
+          reference_date: punctualDate.slice(0, 10),
+        })
+      }
+      setPunctualDialog(false)
+      setPunctualEditId(null)
       await fetchGraph()
-      void refreshUsers()
     } catch (e) {
       setFormErr((e as Error).message)
     } finally {
@@ -531,19 +733,18 @@ export default function CustosDepartamento() {
     }
   }
 
-  const openLink = () => {
-    setLinkDialog(true)
-    setFormErr(null)
-    if (graph?.departments[0]) setLinkDeptId(graph.departments[0].id)
-    if (graph?.costItems[0]) setLinkCostId(graph.costItems[0].id)
-  }
-
-  const openMember = () => {
-    setMemberDialog(true)
-    setFormErr(null)
-    void refreshUsers()
-    if (graph?.departments[0]) setMemDeptId(graph.departments[0].id)
-  }
+  const handleDeletePunctualCost = useCallback(
+    async (id: string) => {
+      if (!window.confirm('Excluir este custo pontual?')) return
+      try {
+        await deleteJson(`/api/cost-management/punctual-costs/${id}`)
+        await fetchGraph()
+      } catch (e) {
+        window.alert((e as Error).message)
+      }
+    },
+    [deleteJson, fetchGraph]
+  )
 
   const handleLinkCostToDepartment = useCallback(
     async (departmentId: string, costId: string) => {
@@ -574,68 +775,23 @@ export default function CustosDepartamento() {
       }
       if (action === 'cost') {
         canvasSpawnRef.current = hasFlow ? { x: ctx!.flowX!, y: ctx!.flowY! } : null
-        setCostDialog(true)
+        resetNewCostForm()
+        setCostDeptId(ctx?.departmentId ?? '')
+        setNewCostDialogOpen(true)
         return
       }
       canvasSpawnRef.current = null
       if (action === 'link') {
         setLinkDialog(true)
+        setFormErr(null)
         if (ctx?.departmentId) setLinkDeptId(ctx.departmentId)
         else if (depts[0]) setLinkDeptId(depts[0].id)
         if (ctx?.costId) setLinkCostId(ctx.costId)
         else if (costs[0]) setLinkCostId(costs[0].id)
-        return
-      }
-      if (action === 'member') {
-        setMemberDialog(true)
-        void refreshUsers()
-        if (ctx?.departmentId) setMemDeptId(ctx.departmentId)
-        else if (depts[0]) setMemDeptId(depts[0].id)
-        return
-      }
-      if (action === 'assignResponsible') {
-        setManageDialogOpen(false)
-        setAssignDialogOpen(true)
-        setFormErr(null)
-        if (ctx?.departmentId) setAssignDeptId(ctx.departmentId)
-        else if (depts[0]) setAssignDeptId(depts[0].id)
-        setAssignEntryId('')
-        void fetchEntries()
       }
     },
-    [graph?.departments, graph?.costItems, refreshUsers, fetchEntries]
+    [graph?.departments, graph?.costItems, resetNewCostForm]
   )
-
-  const handleSaveAssignResponsible = async () => {
-    if (!assignDeptId || !assignEntryId) {
-      setFormErr('Selecione departamento e pessoa do organograma')
-      return
-    }
-    setSaving(true)
-    setFormErr(null)
-    try {
-      await updateEntry(assignEntryId, { department_id: assignDeptId })
-      await fetchEntries()
-      setAssignEntryId('')
-    } catch (e) {
-      setFormErr((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleUnlinkOrgResponsible = async (entryId: string) => {
-    setSaving(true)
-    setFormErr(null)
-    try {
-      await updateEntry(entryId, { department_id: null })
-      await fetchEntries()
-    } catch (e) {
-      setFormErr((e as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const refreshCostGraph = useCallback(async () => {
     await fetchGraph()
@@ -672,9 +828,10 @@ export default function CustosDepartamento() {
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, maxWidth: 900 }}>
             Mapa no mesmo estilo do organograma (layout automático + grade). <strong>Clique</strong> em um card para
-            abrir o painel à direita (filhos vinculados e edição). <strong>Responsáveis</strong> vêm do{' '}
-            <strong>Organograma da Empresa</strong>. <strong>Arraste</strong> entre departamento e custo para vincular;{' '}
-            <strong>Delete</strong> na aresta remove. <strong>Botão direito</strong> no mapa para ações rápidas.
+            abrir o painel à direita. O <strong>responsável do departamento</strong> é escolhido ao criar o centro de
+            custo; o time segue a hierarquia do organograma. <strong>Custos fixos</strong> são cadastrados já vinculados
+            ao departamento. <strong>Arraste</strong> entre departamento e custo para vincular custos existentes;{' '}
+            <strong>Delete</strong> na aresta remove o vínculo. <strong>Botão direito</strong> no mapa para ações rápidas.
           </Typography>
 
           {error?.includes('MIGRATION') || error?.includes('migração') ? (
@@ -740,6 +897,14 @@ export default function CustosDepartamento() {
               graph={graph}
               entryLabel={entryLabel}
               responsiblesForDept={responsiblesForDept}
+              orgEntries={orgEntries}
+              onAddVariableCost={
+                canvasFocus?.kind === 'department'
+                  ? () => openNewCostVariableForDept(canvasFocus.departmentId)
+                  : undefined
+              }
+              onEditPunctualCost={openPunctualDialogEdit}
+              onDeletePunctualCost={(id) => void handleDeletePunctualCost(id)}
               headerActions={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   {canvasFocus?.kind === 'department' ? (
@@ -948,50 +1113,11 @@ export default function CustosDepartamento() {
                 onClick={() => {
                   setManageDialogOpen(false)
                   canvasSpawnRef.current = null
-                  setCostDialog(true)
+                  resetNewCostForm()
+                  setNewCostDialogOpen(true)
                 }}
               >
-                Novo custo fixo…
-              </Button>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<Link2 size={18} />}
-                onClick={() => {
-                  setManageDialogOpen(false)
-                  canvasSpawnRef.current = null
-                  openLink()
-                }}
-              >
-                Vincular custo a departamento…
-              </Button>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<UserPlus size={18} />}
-                onClick={() => {
-                  setManageDialogOpen(false)
-                  canvasSpawnRef.current = null
-                  openMember()
-                }}
-              >
-                Pessoa no departamento (custo individual)…
-              </Button>
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={<UserCircle size={18} />}
-                onClick={() => {
-                  setManageDialogOpen(false)
-                  setAssignDialogOpen(true)
-                  setFormErr(null)
-                  const d0 = graph?.departments?.[0]
-                  setAssignDeptId(d0?.id ?? '')
-                  setAssignEntryId('')
-                  void fetchEntries()
-                }}
-              >
-                Responsável no organograma…
+                Novo custo…
               </Button>
             </Stack>
             <Divider sx={{ my: 2 }} />
@@ -1031,85 +1157,6 @@ export default function CustosDepartamento() {
           </DialogActions>
         </Dialog>
 
-        {/* Vincular pessoa do organograma ao departamento (cdt_user_org.department_id) */}
-        <Dialog open={assignDialogOpen} onClose={() => setAssignDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Responsável no organograma</DialogTitle>
-          <DialogContent>
-            {formErr && assignDialogOpen ? <Alert severity="error" sx={{ mb: 2 }}>{formErr}</Alert> : null}
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Escolha um departamento e uma pessoa já cadastrada em <strong>Organograma da Empresa</strong>. Isso atualiza
-              o vínculo usado neste mapa e na tabela abaixo (não substitui &quot;pessoa no departamento&quot; com custo
-              individual, que usa usuários do sistema).
-            </Typography>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Departamento</InputLabel>
-              <Select value={assignDeptId} label="Departamento" onChange={(e) => setAssignDeptId(e.target.value)}>
-                {(graph?.departments ?? []).map((d) => (
-                  <MenuItem key={d.id} value={d.id}>
-                    {d.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Pessoa no organograma</InputLabel>
-              <Select value={assignEntryId} label="Pessoa no organograma" onChange={(e) => setAssignEntryId(e.target.value)}>
-                {orgEntries.map((e: OrgEntry) => (
-                  <MenuItem key={e.id} value={e.id}>
-                    {entryLabel(e)}
-                    {e.department_id
-                      ? ` → ${graph?.departments.find((x) => x.id === e.department_id)?.name ?? 'outro dept.'}`
-                      : ''}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Button variant="contained" sx={{ mt: 1 }} onClick={() => void handleSaveAssignResponsible()} disabled={saving}>
-              Vincular a este departamento
-            </Button>
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="subtitle2" gutterBottom>
-              Já vinculados a este departamento
-            </Typography>
-            {assignDeptId ? (
-              responsiblesForDept(assignDeptId).length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  Nenhuma pessoa do organograma vinculada a este departamento.
-                </Typography>
-              ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Pessoa</TableCell>
-                      <TableCell align="right">Ação</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {responsiblesForDept(assignDeptId).map((e: OrgEntry) => (
-                      <TableRow key={e.id}>
-                        <TableCell>{entryLabel(e)}</TableCell>
-                        <TableCell align="right">
-                          <Button
-                            size="small"
-                            color="warning"
-                            onClick={() => void handleUnlinkOrgResponsible(e.id)}
-                            disabled={saving}
-                          >
-                            Desvincular
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )
-            ) : null}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setAssignDialogOpen(false)}>Fechar</Button>
-          </DialogActions>
-        </Dialog>
-
         {/* Dialog: departamento */}
         <Dialog
           open={deptDialog}
@@ -1139,14 +1186,13 @@ export default function CustosDepartamento() {
               value={deptDesc}
               onChange={(e) => setDeptDesc(e.target.value)}
             />
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Responsável (organograma, opcional)</InputLabel>
+            <FormControl fullWidth margin="normal" required>
+              <InputLabel>Responsável no organograma</InputLabel>
               <Select
                 value={deptOrgEntryId}
-                label="Responsável (organograma, opcional)"
+                label="Responsável no organograma"
                 onChange={(e) => setDeptOrgEntryId(e.target.value)}
               >
-                <MenuItem value="">— Nenhum —</MenuItem>
                 {orgEntries.map((e: OrgEntry) => (
                   <MenuItem key={e.id} value={e.id}>
                     {entryLabel(e)}
@@ -1155,8 +1201,8 @@ export default function CustosDepartamento() {
               </Select>
             </FormControl>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: -0.5, mb: 1 }}>
-              Pessoas são cadastradas em <strong>Organograma da Empresa</strong>. Você pode vincular depois em
-              &quot;Gerenciar&quot; → Responsável no organograma.
+              Cadastre pessoas em <strong>Organograma da Empresa</strong>. O time do departamento segue a hierarquia
+              abaixo desta pessoa.
             </Typography>
           </DialogContent>
           <DialogActions>
@@ -1167,42 +1213,188 @@ export default function CustosDepartamento() {
           </DialogActions>
         </Dialog>
 
-        {/* Dialog: custo */}
-        <Dialog open={costDialog} onClose={() => setCostDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Novo custo fixo</DialogTitle>
+        {/* Dialog: novo custo (fixo ou variável) */}
+        <Dialog
+          open={newCostDialogOpen}
+          onClose={() => {
+            setNewCostDialogOpen(false)
+            resetNewCostForm()
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Novo custo</DialogTitle>
           <DialogContent>
-            {formErr && costDialog ? <Alert severity="error" sx={{ mb: 2 }}>{formErr}</Alert> : null}
-            <TextField
-              label="Nome"
-              fullWidth
-              margin="normal"
-              value={costName}
-              onChange={(e) => setCostName(e.target.value)}
-            />
-            <TextField
-              label="Valor (mensal)"
-              fullWidth
-              margin="normal"
-              type="text"
-              inputMode="decimal"
-              value={costAmount}
-              onChange={(e) => setCostAmount(e.target.value)}
-              placeholder="Ex.: 1.250,50"
-            />
+            {formErr && newCostDialogOpen ? <Alert severity="error" sx={{ mb: 2 }}>{formErr}</Alert> : null}
+            <FormControl component="fieldset" margin="normal" fullWidth>
+              <FormLabel component="legend">Tipo</FormLabel>
+              <RadioGroup
+                row
+                value={ncIsFixed ? 'fixed' : 'variable'}
+                onChange={(_, v) => {
+                  setNcIsFixed(v === 'fixed')
+                  setFormErr(null)
+                }}
+              >
+                <FormControlLabel value="fixed" control={<Radio size="small" />} label="Fixo (mensal recorrente)" />
+                <FormControlLabel value="variable" control={<Radio size="small" />} label="Variável (não fixo)" />
+              </RadioGroup>
+            </FormControl>
             <FormControl fullWidth margin="normal">
-              <InputLabel>Categoria</InputLabel>
-              <Select value={costCategory} label="Categoria" onChange={(e) => setCostCategory(e.target.value)}>
-                <MenuItem value="ferramenta">Ferramenta</MenuItem>
-                <MenuItem value="licenca">Licença</MenuItem>
-                <MenuItem value="infraestrutura">Infraestrutura</MenuItem>
-                <MenuItem value="servico">Serviço</MenuItem>
-                <MenuItem value="outro">Outro</MenuItem>
+              <InputLabel>Departamento</InputLabel>
+              <Select value={costDeptId} label="Departamento" onChange={(e) => setCostDeptId(e.target.value)}>
+                {(graph?.departments ?? []).map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    {d.name}
+                  </MenuItem>
+                ))}
               </Select>
             </FormControl>
+            {ncIsFixed ? (
+              <>
+                <TextField
+                  label="Nome"
+                  fullWidth
+                  margin="normal"
+                  value={costName}
+                  onChange={(e) => setCostName(e.target.value)}
+                />
+                <TextField
+                  label="Valor (mensal)"
+                  fullWidth
+                  margin="normal"
+                  type="text"
+                  inputMode="decimal"
+                  value={costAmount}
+                  onChange={(e) => setCostAmount(e.target.value)}
+                  placeholder="Ex.: 1.250,50"
+                />
+                <FormControl fullWidth margin="normal">
+                  <InputLabel>Categoria</InputLabel>
+                  <Select value={costCategory} label="Categoria" onChange={(e) => setCostCategory(e.target.value)}>
+                    <MenuItem value="ferramenta">Ferramenta</MenuItem>
+                    <MenuItem value="licenca">Licença</MenuItem>
+                    <MenuItem value="infraestrutura">Infraestrutura</MenuItem>
+                    <MenuItem value="servico">Serviço</MenuItem>
+                    <MenuItem value="outro">Outro</MenuItem>
+                  </Select>
+                </FormControl>
+              </>
+            ) : (
+              <>
+                <FormControl component="fieldset" margin="normal" fullWidth>
+                  <FormLabel component="legend">Como entra no tempo</FormLabel>
+                  <RadioGroup
+                    row
+                    value={ncVarKind}
+                    onChange={(_, v) => {
+                      setNcVarKind(v as 'punctual' | 'period')
+                      setFormErr(null)
+                    }}
+                  >
+                    <FormControlLabel value="punctual" control={<Radio size="small" />} label="Pontual (uma data)" />
+                    <FormControlLabel value="period" control={<Radio size="small" />} label="Período" />
+                  </RadioGroup>
+                </FormControl>
+                <TextField
+                  label="Título"
+                  fullWidth
+                  margin="normal"
+                  value={ncVarTitle}
+                  onChange={(e) => setNcVarTitle(e.target.value)}
+                />
+                <TextField
+                  label="Descrição (opcional)"
+                  fullWidth
+                  margin="normal"
+                  multiline
+                  minRows={2}
+                  value={ncVarDesc}
+                  onChange={(e) => setNcVarDesc(e.target.value)}
+                />
+                {ncVarKind === 'punctual' ? (
+                  <TextField
+                    label="Data de referência"
+                    type="date"
+                    fullWidth
+                    margin="normal"
+                    InputLabelProps={{ shrink: true }}
+                    value={ncVarDate}
+                    onChange={(e) => setNcVarDate(e.target.value)}
+                  />
+                ) : (
+                  <>
+                    <TextField
+                      label="De (data inicial)"
+                      type="date"
+                      fullWidth
+                      margin="normal"
+                      InputLabelProps={{ shrink: true }}
+                      value={ncPeriodStart}
+                      onChange={(e) => setNcPeriodStart(e.target.value)}
+                    />
+                    <TextField
+                      label="Até (data final)"
+                      type="date"
+                      fullWidth
+                      margin="normal"
+                      InputLabelProps={{ shrink: true }}
+                      value={ncPeriodEnd}
+                      onChange={(e) => setNcPeriodEnd(e.target.value)}
+                    />
+                    {ncPeriodStart && ncPeriodEnd && ncPeriodEnd >= ncPeriodStart ? (
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                        {(() => {
+                          const m = inclusiveMonthCount(ncPeriodStart, ncPeriodEnd)
+                          const total = brlFieldToNumber(ncVarAmount)
+                          if (m <= 0) return null
+                          const parts = splitTotalAcrossMonths(total, m)
+                          const per = parts[0] ?? 0
+                          return (
+                            <>
+                              {m} {m === 1 ? 'mês' : 'meses'} no período. Valor total rateado para dashboards mensais:{' '}
+                              <strong>
+                                {per.toLocaleString('pt-BR', { style: 'currency', currency: ncVarCurrency || 'BRL' })}
+                              </strong>
+                              {m > 1 ? ' /mês (último mês ajusta centavos).' : '.'}
+                            </>
+                          )
+                        })()}
+                      </Typography>
+                    ) : null}
+                  </>
+                )}
+                <TextField
+                  label={ncVarKind === 'period' ? 'Valor total do período' : 'Valor'}
+                  fullWidth
+                  margin="normal"
+                  type="text"
+                  inputMode="decimal"
+                  value={ncVarAmount}
+                  onChange={(e) => setNcVarAmount(e.target.value)}
+                  placeholder="Ex.: 1.250,50"
+                />
+                <TextField
+                  label="Moeda"
+                  fullWidth
+                  margin="normal"
+                  value={ncVarCurrency}
+                  onChange={(e) => setNcVarCurrency(e.target.value.slice(0, 8).toUpperCase() || 'BRL')}
+                  placeholder="BRL"
+                />
+              </>
+            )}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setCostDialog(false)}>Cancelar</Button>
-            <Button variant="contained" onClick={() => void handleCreateCost()} disabled={saving}>
+            <Button
+              onClick={() => {
+                setNewCostDialogOpen(false)
+                resetNewCostForm()
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={() => void handleSaveNewCost()} disabled={saving}>
               Salvar
             </Button>
           </DialogActions>
@@ -1357,45 +1549,116 @@ export default function CustosDepartamento() {
           </DialogActions>
         </Dialog>
 
-        {/* Dialog: membro */}
-        <Dialog open={memberDialog} onClose={() => setMemberDialog(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Pessoa no departamento</DialogTitle>
+        {/* Dialog: editar custo variável (pontual ou período) */}
+        <Dialog
+          open={punctualDialog}
+          onClose={() => {
+            setPunctualDialog(false)
+            setPunctualEditId(null)
+          }}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Editar custo variável</DialogTitle>
           <DialogContent>
-            {formErr && memberDialog ? <Alert severity="error" sx={{ mb: 2 }}>{formErr}</Alert> : null}
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Departamento</InputLabel>
-              <Select value={memDeptId} label="Departamento" onChange={(e) => setMemDeptId(e.target.value)}>
-                {(graph?.departments ?? []).map((d) => (
-                  <MenuItem key={d.id} value={d.id}>
-                    {d.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth margin="normal">
-              <InputLabel>Usuário</InputLabel>
-              <Select value={memUserId} label="Usuário" onChange={(e) => setMemUserId(e.target.value)}>
-                {users.map((u) => (
-                  <MenuItem key={u.id} value={u.id}>
-                    {u.name} ({u.email})
-                  </MenuItem>
-                ))}
-              </Select>
+            {formErr && punctualDialog ? <Alert severity="error" sx={{ mb: 2 }}>{formErr}</Alert> : null}
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+              Novos lançamentos: use <strong>Gerenciar</strong> ou <strong>Novo custo variável</strong> no painel do
+              departamento. Aqui você ajusta um registro já existente.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Departamento:{' '}
+              <strong>{graph?.departments.find((d) => d.id === punctualDeptId)?.name ?? '—'}</strong>
+            </Typography>
+            <FormControl component="fieldset" margin="normal" fullWidth>
+              <FormLabel component="legend">Tipo</FormLabel>
+              <RadioGroup
+                row
+                value={punctualTimingKind}
+                onChange={(_, v) => setPunctualTimingKind(v as 'punctual' | 'period')}
+              >
+                <FormControlLabel value="punctual" control={<Radio size="small" />} label="Pontual" />
+                <FormControlLabel value="period" control={<Radio size="small" />} label="Período" />
+              </RadioGroup>
             </FormControl>
             <TextField
-              label="Custo mensal individual"
+              label="Título"
+              fullWidth
+              margin="normal"
+              value={punctualTitle}
+              onChange={(e) => setPunctualTitle(e.target.value)}
+              placeholder="Ex.: Treinamento externo"
+            />
+            <TextField
+              label="Descrição (opcional)"
+              fullWidth
+              margin="normal"
+              multiline
+              minRows={2}
+              value={punctualDesc}
+              onChange={(e) => setPunctualDesc(e.target.value)}
+            />
+            {punctualTimingKind === 'punctual' ? (
+              <TextField
+                label="Data de referência"
+                type="date"
+                fullWidth
+                margin="normal"
+                InputLabelProps={{ shrink: true }}
+                value={punctualDate}
+                onChange={(e) => setPunctualDate(e.target.value)}
+              />
+            ) : (
+              <>
+                <TextField
+                  label="De (data inicial)"
+                  type="date"
+                  fullWidth
+                  margin="normal"
+                  InputLabelProps={{ shrink: true }}
+                  value={punctualPeriodStart}
+                  onChange={(e) => setPunctualPeriodStart(e.target.value)}
+                />
+                <TextField
+                  label="Até (data final)"
+                  type="date"
+                  fullWidth
+                  margin="normal"
+                  InputLabelProps={{ shrink: true }}
+                  value={punctualPeriodEnd}
+                  onChange={(e) => setPunctualPeriodEnd(e.target.value)}
+                />
+              </>
+            )}
+            <TextField
+              label={punctualTimingKind === 'period' ? 'Valor total do período' : 'Valor'}
               fullWidth
               margin="normal"
               type="text"
               inputMode="decimal"
-              value={memCost}
-              onChange={(e) => setMemCost(e.target.value)}
-              placeholder="Ex.: 3.500,00"
+              value={punctualAmount}
+              onChange={(e) => setPunctualAmount(e.target.value)}
+              placeholder="Ex.: 1.250,50"
+            />
+            <TextField
+              label="Moeda"
+              fullWidth
+              margin="normal"
+              value={punctualCurrency}
+              onChange={(e) => setPunctualCurrency(e.target.value.slice(0, 8).toUpperCase() || 'BRL')}
+              placeholder="BRL"
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setMemberDialog(false)}>Cancelar</Button>
-            <Button variant="contained" onClick={() => void handleMember()} disabled={saving}>
+            <Button
+              onClick={() => {
+                setPunctualDialog(false)
+                setPunctualEditId(null)
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button variant="contained" onClick={() => void handleSavePunctual()} disabled={saving || !punctualEditId}>
               Salvar
             </Button>
           </DialogActions>

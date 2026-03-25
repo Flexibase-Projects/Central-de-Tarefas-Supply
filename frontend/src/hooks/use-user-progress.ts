@@ -5,7 +5,7 @@ import type { UserProgress } from '@/types'
 const API_URL = import.meta.env.VITE_API_URL || ''
 const POLL_INTERVAL_MS = 60_000 // 60 seconds
 
-export function useUserProgress() {
+export function useUserProgress(enabled = true) {
   const { getAuthHeaders } = useAuth()
   const [data, setData] = useState<UserProgress | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,6 +45,13 @@ export function useUserProgress() {
 
   // Initial fetch + 60-second polling
   useEffect(() => {
+    if (!enabled) {
+      setData(null)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     fetchProgress()
 
     intervalRef.current = setInterval(() => {
@@ -57,9 +64,11 @@ export function useUserProgress() {
         intervalRef.current = null
       }
     }
-  }, [fetchProgress])
+  }, [enabled, fetchProgress])
 
   useEffect(() => {
+    if (!enabled) return
+
     const handler = () => {
       void fetchProgress()
     }
@@ -71,7 +80,7 @@ export function useUserProgress() {
       window.removeEventListener('cdt-todo-completed', handler)
       window.removeEventListener('cdt-activities-invalidated', handler)
     }
-  }, [fetchProgress])
+  }, [enabled, fetchProgress])
 
   const notifyXpAwarded = useCallback((xpAwarded: number) => {
     setPendingXp(xpAwarded)

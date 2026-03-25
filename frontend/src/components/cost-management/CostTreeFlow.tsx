@@ -292,7 +292,7 @@ function structureSignature(graph: CostManagementGraph): string {
   })
 }
 
-export type CanvasDialogAction = 'dept' | 'cost' | 'link' | 'member' | 'assignResponsible'
+export type CanvasDialogAction = 'dept' | 'cost' | 'link'
 
 export type CanvasDialogContext = {
   departmentId?: string
@@ -718,37 +718,22 @@ function CostCanvasCore({
                 })
               }
             >
-              Novo custo fixo…
-            </MenuItem>
-            <MenuItem onClick={() => fireDialog('link')}>Vincular custo a departamento…</MenuItem>
-            <MenuItem onClick={() => fireDialog('member')}>Pessoa no departamento…</MenuItem>
-            <MenuItem onClick={() => fireDialog('assignResponsible')}>
-              Responsável (organograma)…
+              Novo custo…
             </MenuItem>
           </>
         )}
         {ctxMenu?.variant === 'dept' && (
           <>
             <MenuItem
-              onClick={() => fireDialog('assignResponsible', { departmentId: ctxMenu.departmentId })}
-            >
-              Responsável (organograma)…
-            </MenuItem>
-            <MenuItem onClick={() => fireDialog('link', { departmentId: ctxMenu.departmentId })}>
-              Vincular custo a este departamento…
-            </MenuItem>
-            <MenuItem onClick={() => fireDialog('member', { departmentId: ctxMenu.departmentId })}>
-              Adicionar pessoa neste departamento…
-            </MenuItem>
-            <MenuItem
               onClick={() =>
                 fireDialog('cost', {
+                  departmentId: ctxMenu.departmentId,
                   flowX: ctxMenu.flowX + SPAWN_OFFSET_COST.x,
                   flowY: ctxMenu.flowY + SPAWN_OFFSET_COST.y,
                 })
               }
             >
-              Novo custo fixo (aqui)…
+              Novo custo neste departamento…
             </MenuItem>
             <MenuItem
               onClick={() =>

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 /**
  * Retorna a contagem de TO-DOs pendentes (não concluídos) atribuídos ao usuário logado.
  * Usa Supabase diretamente para uma query leve, sem carregar todos os registros.
+ * Deve usar a mesma tabela que a API Supply (`supply_project_todos`), não `cdt_project_todos`.
  */
 export function useMyPendingTodosCount() {
   const { currentUser } = useAuth()
@@ -16,7 +17,7 @@ export function useMyPendingTodosCount() {
       return
     }
     const { count: c, error } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('*', { count: 'exact', head: true })
       .eq('assigned_to', currentUser.id)
       .eq('completed', false)

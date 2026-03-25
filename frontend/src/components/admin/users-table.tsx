@@ -23,15 +23,15 @@ import {
   Typography,
 } from '@mui/material'
 import { ToggleOn, ToggleOff } from '@mui/icons-material'
-import { Plus, Pencil, UserPlus } from '@/components/ui/icons'
+import { UserPlus, Pencil } from '@/components/ui/icons'
 import { UserWithRole } from '@/types'
 import { useUsers } from '@/hooks/use-users'
 import { useRoles } from '@/hooks/use-roles'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
-/** Desative quando criação/vínculo via painel estiver estável de novo (evita 503 no Admin API). */
-const ADMIN_NEW_USER_FLOW_ENABLED = false
+/** Criação manual no painel permanece bloqueada; fluxo oficial é importar do Supabase Auth. */
+const ADMIN_MANUAL_CREATE_ENABLED = false
 
 type AuthListUser = {
   id: string
@@ -59,7 +59,6 @@ export function UsersTable() {
   const {
     users,
     loading,
-    createUserWithAuth,
     updateUser,
     setUserActive,
     assignRole,
@@ -74,7 +73,6 @@ export function UsersTable() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null)
   const [formData, setFormData] = useState({ email: '', name: '', avatar_url: '' })
-  const [newUserRoleId, setNewUserRoleId] = useState('')
   const [savingUser, setSavingUser] = useState(false)
 
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false)
@@ -101,17 +99,15 @@ export function UsersTable() {
   }, [authList, authSearch])
 
   const handleOpenNewUser = () => {
-    if (!ADMIN_NEW_USER_FLOW_ENABLED) return
     setAuthSearch('')
     setIsNewUserDialogOpen(true)
     fetchAuthList()
   }
 
   const handleCreate = () => {
-    if (!ADMIN_NEW_USER_FLOW_ENABLED) return
+    if (!ADMIN_MANUAL_CREATE_ENABLED) return
     setEditingUser(null)
     setFormData({ email: '', name: '', avatar_url: '' })
-    setNewUserRoleId(getPreferredRoleId(roleItems))
     setIsUserDialogOpen(true)
   }
 
@@ -126,22 +122,13 @@ export function UsersTable() {
   }
 
   const handleSubmitUser = async () => {
-    if (!editingUser && !ADMIN_NEW_USER_FLOW_ENABLED) {
+    if (!editingUser) {
       alert('Criação de usuário pelo painel está temporariamente indisponível.')
       return
     }
     setSavingUser(true)
     try {
-      if (editingUser) {
-        await updateUser(editingUser.id, formData)
-      } else {
-        await createUserWithAuth({
-          email: formData.email,
-          name: formData.name,
-          avatar_url: formData.avatar_url || undefined,
-          role_id: newUserRoleId || undefined,
-        })
-      }
+      await updateUser(editingUser.id, formData)
       setIsUserDialogOpen(false)
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Erro ao salvar usuario')
@@ -215,23 +202,16 @@ export function UsersTable() {
           Usuarios com acesso
         </Typography>
         <Tooltip
-          title={
-            ADMIN_NEW_USER_FLOW_ENABLED
-              ? 'Abrir cadastro de novos usuários'
-              : 'Criação de novos usuários pelo painel está temporariamente indisponível (serviço indisponível ou instável).'
-          }
+          title="Importar usuários já cadastrados no Supabase Auth"
         >
-          <span>
-            <Button
-              variant="contained"
-              size="small"
-              onClick={handleOpenNewUser}
-              startIcon={<Plus size={20} />}
-              disabled={!ADMIN_NEW_USER_FLOW_ENABLED}
-            >
-              Novo Usuario
-            </Button>
-          </span>
+          <Button
+            variant="contained"
+            size="small"
+            onClick={handleOpenNewUser}
+            startIcon={<UserPlus size={18} />}
+          >
+            Importar do Auth
+          </Button>
         </Tooltip>
       </Box>
 
@@ -323,9 +303,9 @@ export function UsersTable() {
       <Dialog
         open={isNewUserDialogOpen}
         onClose={() => setIsNewUserDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
-        PaperProps={{ sx: { minHeight: '60vh' } }}
+        PaperProps={{ sx: { minHeight: '60vh', width: 'min(1200px, 96vw)' } }}
       >
         <DialogTitle>Novo usuario — buscar no Supabase Auth</DialogTitle>
         <DialogContent>
@@ -345,15 +325,21 @@ export function UsersTable() {
               <CircularProgress />
             </Box>
           ) : (
-            <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-              <Table size="small">
+            <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, overflowX: 'auto' }}>
+              <Table
+                size="small"
+                sx={{
+                  tableLayout: 'fixed',
+                  minWidth: 720,
+                }}
+              >
                 <TableHead>
                   <TableRow sx={{ bgcolor: 'action.hover' }}>
-                    <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Nome</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Cadastro</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                    <TableCell sx={{ fontWeight: 600, py: 0.75, width: '40%' }}>Email</TableCell>
+                    <TableCell sx={{ fontWeight: 600, py: 0.75, width: '20%' }}>Nome</TableCell>
+                    <TableCell sx={{ fontWeight: 600, py: 0.75, width: '14%' }}>Cadastro</TableCell>
+                    <TableCell sx={{ fontWeight: 600, py: 0.75, width: '12%' }}>Status</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600, py: 0.75, width: '14%' }}>
                       Acao
                     </TableCell>
                   </TableRow>
@@ -371,11 +357,19 @@ export function UsersTable() {
                     </TableRow>
                   ) : (
                     filteredAuthList.map((authUser) => (
-                      <TableRow key={authUser.id} hover>
-                        <TableCell>{authUser.email}</TableCell>
-                        <TableCell>{authUser.name || '-'}</TableCell>
+                      <TableRow key={authUser.id} hover sx={{ '& td': { py: 0.5 } }}>
                         <TableCell>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography noWrap title={authUser.email}>
+                            {authUser.email}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography noWrap title={authUser.name || '-'}>
+                            {authUser.name || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
                             {authUser.created_at
                               ? formatDistanceToNow(new Date(authUser.created_at), {
                                   addSuffix: true,
@@ -392,7 +386,7 @@ export function UsersTable() {
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ pr: 1 }}>
                           {authUser.in_cdt ? (
                             <Typography variant="caption" color="text.secondary">
                               Ja no sistema
@@ -404,6 +398,13 @@ export function UsersTable() {
                               startIcon={<UserPlus size={18} />}
                               disabled={Boolean(givingAccessId)}
                               onClick={() => handleOpenGiveAccess(authUser)}
+                              sx={{
+                                py: 0.25,
+                                px: 1,
+                                minHeight: 28,
+                                whiteSpace: 'nowrap',
+                                '& .MuiButton-startIcon': { mr: 0.5 },
+                              }}
                             >
                               Liberar acesso
                             </Button>
@@ -420,7 +421,7 @@ export function UsersTable() {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Tooltip
             title={
-              ADMIN_NEW_USER_FLOW_ENABLED
+              ADMIN_MANUAL_CREATE_ENABLED
                 ? 'Criar conta no Auth e no sistema com senha inicial'
                 : 'Temporariamente indisponível.'
             }
@@ -431,7 +432,7 @@ export function UsersTable() {
                   setIsNewUserDialogOpen(false)
                   handleCreate()
                 }}
-                disabled={!ADMIN_NEW_USER_FLOW_ENABLED}
+                disabled={!ADMIN_MANUAL_CREATE_ENABLED}
               >
                 Criar usuario manualmente
               </Button>
@@ -443,7 +444,7 @@ export function UsersTable() {
       </Dialog>
 
       <Dialog open={isUserDialogOpen} onClose={() => setIsUserDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingUser ? 'Editar Usuario' : 'Criar usuario manualmente'}</DialogTitle>
+        <DialogTitle>Editar Usuario</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
             <TextField
@@ -466,32 +467,6 @@ export function UsersTable() {
               onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
               fullWidth
             />
-            {!editingUser && (
-              <FormControl fullWidth size="small">
-                <InputLabel>Cargo inicial</InputLabel>
-                <Select
-                  label="Cargo inicial"
-                  value={newUserRoleId}
-                  onChange={(e) => setNewUserRoleId(String(e.target.value))}
-                  displayEmpty
-                >
-                  <MenuItem value="">
-                    <em>Sem cargo (atribuir depois)</em>
-                  </MenuItem>
-                  {roles.map((role) => (
-                    <MenuItem key={role.id} value={role.id}>
-                      {role.display_name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
-            {!editingUser && (
-              <Typography variant="caption" color="text.secondary">
-                Sera criada conta no Supabase Auth com senha inicial configurada no servidor; no primeiro acesso o
-                usuario define senha forte na tela de login.
-              </Typography>
-            )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

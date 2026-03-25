@@ -35,7 +35,7 @@ router.post('/first-access-hint', async (req, res) => {
   }
 });
 
-/** Define a primeira senha forte; so permitido quando must_set_password esta true no cdt_users. */
+/** Define a primeira senha forte; so permitido quando must_set_password esta true em supply_users. */
 router.post('/set-initial-password', async (req, res) => {
   try {
     const { email, password } = req.body as { email?: string; password?: string };

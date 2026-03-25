@@ -1,7 +1,7 @@
 {
   "name": "cdt-supply",
-  "version": "1.0.0",
-  "description": "Central de Tarefas do Departamento de Supply Chain da Flexibase",
+  "version": "1.0.1",
+  "description": "Central de Tarefas - Supply (Supply Chain, Flexibase)",
   "private": true,
   "workspaces": [
     "frontend",
@@ -12,7 +12,8 @@
     "dev:server": "concurrently \"npm run dev --workspace=backend\" \"npm run dev:server --workspace=frontend\"",
     "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
     "start": "npm run start --workspace=backend",
-    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
+    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend",
+    "seed:supply-users": "node backend/scripts/seed-supply-auth-users.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

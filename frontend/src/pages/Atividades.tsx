@@ -6,6 +6,7 @@ import { ActivityCardDialog } from '@/components/kanban/activity-card-dialog'
 import { CreateActivityDialog } from '@/components/kanban/create-activity-dialog'
 import { useActivities } from '@/hooks/use-activities'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { usePermissions } from '@/hooks/use-permissions'
 import { useAuth } from '@/contexts/AuthContext'
 import { Activity, Project } from '@/types'
@@ -34,9 +35,8 @@ async function findActivityIdByTodo(params: {
 
 export default function Atividades() {
   const { activities, loading, createActivity, updateActivity, moveActivity, deleteActivity } = useActivities()
-  const { hasRole } = usePermissions()
+  const { hasPermission } = usePermissions()
   const { getAuthHeaders } = useAuth()
-  const isAdmin = hasRole('admin')
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
@@ -192,7 +192,7 @@ export default function Atividades() {
           />
         </Box>
 
-        {isAdmin && (
+        <RequirePermission permission="manage_activities">
           <Fab
             color="primary"
             aria-label="Nova Atividade"
@@ -201,7 +201,7 @@ export default function Atividades() {
           >
             <Plus size={24} />
           </Fab>
-        )}
+        </RequirePermission>
 
         <CreateActivityDialog
           open={isCreateDialogOpen}
@@ -214,7 +214,7 @@ export default function Atividades() {
           open={isActivityDialogOpen}
           onOpenChange={setIsActivityDialogOpen}
           onUpdate={handleUpdateActivity}
-          onDelete={isAdmin ? handleDeleteActivity : undefined}
+          onDelete={hasPermission('manage_activities') ? handleDeleteActivity : undefined}
           highlightedTodoId={highlightedTodoId}
         />
       </Box>

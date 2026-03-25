@@ -39,7 +39,6 @@ import cors from 'cors';
 import projectsRoutes from './routes/projects.js';
 import tasksRoutes from './routes/tasks.js';
 import activitiesRoutes from './routes/activities.js';
-import githubRoutes from './routes/github.js';
 import todosRoutes from './routes/todos.js';
 import projectCommentsRoutes from './routes/project-comments.js';
 import permissionsRoutes from './routes/permissions.js';
@@ -56,6 +55,7 @@ import departmentsRoutes from './routes/departments.js';
 import costItemsRoutes from './routes/cost-items.js';
 import costMapRoutes from './routes/cost-map.js';
 import costManagementSummaryRoutes from './routes/cost-management-summary.js';
+import settingsRoutes from './routes/settings.js';
 import { authMiddleware } from './middleware/auth.js';
 import { isSupabaseConnectionRefused, SUPABASE_UNAVAILABLE_MESSAGE } from './utils/supabase-errors.js';
 
@@ -177,7 +177,6 @@ app.use(authMiddleware);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/activities', activitiesRoutes);
-app.use('/api/github', githubRoutes);
 app.use('/api/todos', todosRoutes);
 app.use('/api/project-comments', projectCommentsRoutes);
 app.use('/api/permissions', permissionsRoutes);
@@ -194,6 +193,7 @@ app.use('/api/departments', departmentsRoutes);
 app.use('/api/cost-items', costItemsRoutes);
 app.use('/api/cost-map', costMapRoutes);
 app.use('/api/cost-management', costManagementSummaryRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Tratamento de payload too large (413) em JSON para o cliente
 app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -241,14 +241,5 @@ async function logStartupStatus() {
     console.log(`   SUPABASE_URL: ${process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing'}`);
     console.log(`   SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✅ Set' : '❌ Missing'}`);
     console.log(`   SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'}`);
-  }
-  const hasGitHubToken = process.env.GITHUB_TOKEN;
-  if (hasGitHubToken) {
-    const token: string = hasGitHubToken;
-    console.log('✅ GitHub token configured - GitHub API operations enabled');
-    console.log(`   Token: ${token.substring(0, 7)}...${token.substring(token.length - 4)}`);
-  } else {
-    console.warn('⚠️  GitHub token not configured - GitHub API operations will be limited');
-    console.warn('⚠️  Add GITHUB_TOKEN to backend/.env.local to enable full GitHub integration');
   }
 }

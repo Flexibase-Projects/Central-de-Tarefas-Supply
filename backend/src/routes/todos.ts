@@ -606,11 +606,15 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete a todo (admin only)
+// Delete a todo: admin (qualquer) ou usuário comum apenas se for o criador (created_by)
 router.delete('/:id', async (req, res) => {
   try {
-    const requesterId = await ensureAdmin(req, res);
-    if (!requesterId) return;
+    const requesterId = getRequesterId(req);
+    if (!requesterId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const privilegeUserId = getPrivilegeRequesterId(req);
+    const isRequesterAdmin = privilegeUserId ? await hasRole(privilegeUserId, 'admin') : false;
 
     const { id } = req.params;
     const { data: currentTodo, error: currentTodoError } = await getTodoByIdCompat(id);
@@ -620,6 +624,14 @@ router.delete('/:id', async (req, res) => {
     }
 
     const existingTodo = currentTodo as TodoRecord;
+
+    if (!isRequesterAdmin) {
+      if (!existingTodo.created_by || existingTodo.created_by !== requesterId) {
+        return res.status(403).json({
+          error: 'Você só pode excluir to-dos que você criou.',
+        });
+      }
+    }
     let xpDelta = 0;
     let xpAction: 'none' | 'reverted' = 'none';
 

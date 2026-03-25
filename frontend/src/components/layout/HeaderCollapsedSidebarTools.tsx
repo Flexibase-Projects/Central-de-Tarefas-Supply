@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Box, LinearProgress, Menu as MuiMenu, MenuItem, Tooltip, Typography, useTheme } from '@mui/material'
 import { DemandCard } from '@/components/layout/AppSidebar'
-import { LEVEL_CARD_MENU_ITEMS } from '@/components/layout/sidebar-level-nav'
+import { getLevelCardMenuItems } from '@/components/layout/sidebar-level-nav'
 import { TierBadge } from '@/components/gamification/TierBadge'
 import { getTierForLevel } from '@/utils/tier'
 import type { UserProgress } from '@/types'
@@ -11,6 +11,7 @@ export interface HeaderCollapsedSidebarToolsProps {
   pendingTodosCount: number | null
   progressData: UserProgress | null
   progressLoading: boolean
+  gamificationEnabled: boolean
 }
 
 /**
@@ -21,6 +22,7 @@ export function HeaderCollapsedSidebarTools({
   pendingTodosCount,
   progressData,
   progressLoading,
+  gamificationEnabled,
 }: HeaderCollapsedSidebarToolsProps) {
   const theme = useTheme()
   const isLight = theme.palette.mode === 'light'
@@ -28,6 +30,8 @@ export function HeaderCollapsedSidebarTools({
   const location = useLocation()
   const activeColor = theme.palette.primary.main
   const [levelMenuAnchor, setLevelMenuAnchor] = useState<HTMLElement | null>(null)
+
+  const levelMenuItems = getLevelCardMenuItems(gamificationEnabled)
 
   return (
     <>
@@ -44,7 +48,7 @@ export function HeaderCollapsedSidebarTools({
         }}
       >
         <DemandCard count={pendingTodosCount} headerInline />
-        <Tooltip title="Nível, conquistas e ajuda" placement="bottom">
+        <Tooltip title={gamificationEnabled ? 'Nível, conquistas e ajuda' : 'Perfil'} placement="bottom">
           <Box
             component="button"
             type="button"
@@ -69,7 +73,11 @@ export function HeaderCollapsedSidebarTools({
               },
             }}
           >
-            {progressLoading || !progressData ? (
+            {!gamificationEnabled ? (
+              <Typography component="span" variant="caption" sx={{ fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                Perfil
+              </Typography>
+            ) : progressLoading || !progressData ? (
               <Box sx={{ width: 72, py: 0.5 }}>
                 <LinearProgress
                   color="secondary"
@@ -115,7 +123,7 @@ export function HeaderCollapsedSidebarTools({
           },
         }}
       >
-        {LEVEL_CARD_MENU_ITEMS.map((item) => {
+        {levelMenuItems.map((item) => {
           const Icon = item.icon
           const active = location.pathname === item.url
           return (

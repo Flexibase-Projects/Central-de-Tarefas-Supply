@@ -277,7 +277,7 @@ export function useTodos(scope: TodosScope | null) {
           {
             event: '*',
             schema: 'public',
-            table: 'cdt_project_todos',
+            table: 'supply_project_todos',
             filter: `project_id=eq.${projectId}`,
           },
           (payload) => {
@@ -316,7 +316,7 @@ export function useTodos(scope: TodosScope | null) {
           {
             event: '*',
             schema: 'public',
-            table: 'cdt_project_todos',
+            table: 'supply_project_todos',
             filter: `activity_id=eq.${activityId}`,
           },
           (payload) => {

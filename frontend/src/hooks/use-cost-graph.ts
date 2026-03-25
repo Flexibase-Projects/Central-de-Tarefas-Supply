@@ -23,6 +23,7 @@ export function useCostGraph() {
         departmentCosts: data.departmentCosts ?? [],
         members: data.members ?? [],
         costItems: data.costItems ?? [],
+        punctualCosts: data.punctualCosts ?? [],
       })
     } catch (e) {
       setError((e as Error).message)
@@ -41,9 +42,13 @@ export type CostSummaryResponse = {
     departmentName: string
     fixedCostsTotal: number
     peopleCostsTotal: number
+    orgPeopleCostsTotal?: number
+    punctualCostsTotal?: number
     total: number
     costItemCount: number
     memberCount: number
+    orgPersonCount?: number
+    punctualCount?: number
   }[]
   costItemsByStatus: Record<string, { count: number; amount: number }>
   costItemsNarrative: Record<string, unknown>[]

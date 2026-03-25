@@ -72,7 +72,7 @@ export default function ConfiguracoesHub() {
               Nenhuma configuração adicional disponível para o seu perfil.
             </Typography>
             <Typography variant="body2" color="text.disabled">
-              Dúvidas? Fale com um administrador da Central de Tarefas.
+              Dúvidas? Fale com um administrador da Central de Tarefas - Supply.
             </Typography>
           </CardContent>
         </Card>

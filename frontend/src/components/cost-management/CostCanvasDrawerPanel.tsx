@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@mui/material'
 import type { ReactNode } from 'react'
-import type { CostCanvasFocus, CostManagementGraph } from '@/types/cost-org'
+import type { CostCanvasFocus, CostManagementGraph, PunctualCostRow } from '@/types/cost-org'
 import type { OrgEntry } from '@/hooks/use-org'
 
 type Props = {
@@ -22,6 +22,11 @@ type Props = {
   graph: CostManagementGraph | null
   entryLabel: (e: OrgEntry) => string
   responsiblesForDept: (deptId: string) => OrgEntry[]
+  /** Linhas do organograma (custos em monthly_cost por departamento) */
+  orgEntries: OrgEntry[]
+  onAddVariableCost?: () => void
+  onEditPunctualCost?: (row: PunctualCostRow) => void
+  onDeletePunctualCost?: (id: string) => void
   headerActions?: ReactNode
   onEditCostFull: (costId: string) => void
   drawerDeptEditOpen: boolean
@@ -86,6 +91,10 @@ export function CostCanvasDrawerPanel({
   drawerMemberSaving,
   onSaveDrawerMember,
   footerActions,
+  orgEntries,
+  onAddVariableCost,
+  onEditPunctualCost,
+  onDeletePunctualCost,
 }: Props) {
   if (!graph || !focus) {
     return (
@@ -123,6 +132,16 @@ export function CostCanvasDrawerPanel({
       .map((l) => graph.costItems.find((c) => c.id === l.cost_id))
       .filter((c): c is NonNullable<typeof c> => Boolean(c))
     const mems = graph.members.filter((m) => m.department_id === focus.departmentId)
+    const punctuals = (graph.punctualCosts ?? []).filter((p) => p.department_id === focus.departmentId)
+    const orgPeople = [...orgEntries]
+      .filter((e) => e.department_id === focus.departmentId)
+      .sort((a, b) => a.display_order - b.display_order || a.person_name.localeCompare(b.person_name))
+
+    const fixedSum = costItems.reduce((s, c) => s + (c.is_active !== false ? Number(c.amount) || 0 : 0), 0)
+    const memSum = mems.reduce((s, m) => s + (Number(m.individual_monthly_cost) || 0), 0)
+    const orgSum = orgPeople.reduce((s, e) => s + (Number(e.monthly_cost) || 0), 0)
+    const punctualSum = punctuals.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+    const grandTotal = fixedSum + memSum + orgSum + punctualSum
 
     return (
       <Box
@@ -161,18 +180,136 @@ export function CostCanvasDrawerPanel({
 
         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', mt: 1.5 }}>
           <Divider sx={{ mb: 2 }} />
+          <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+            Resumo financeiro do departamento
+          </Typography>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(118px, 1fr))',
+              gap: 1.25,
+              mb: 2,
+            }}
+          >
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Fixos (mês)
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {money(fixedSum)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Usuários sistema
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {money(memSum)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Organograma
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {money(orgSum)}
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Pontuais (soma)
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
+                {money(punctualSum)}
+              </Typography>
+            </Box>
+            <Box sx={{ gridColumn: '1 / -1' }}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Total (fixos + pessoas + organograma + pontuais)
+              </Typography>
+              <Typography variant="subtitle1" fontWeight={800} color="primary">
+                {money(grandTotal)}
+              </Typography>
+            </Box>
+          </Box>
+
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Responsáveis (organograma)
           </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 2 }}>
             {resp.length === 0 ? (
               <Typography variant="body2" color="text.disabled">
-                Nenhum — vincule em Gerenciar → Responsável no organograma
+                Nenhum — o responsável é definido ao criar o departamento (organograma).
               </Typography>
             ) : (
               resp.map((e) => <Chip key={e.id} size="small" variant="outlined" label={entryLabel(e)} />)
             )}
           </Box>
+
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Pessoas no organograma ({orgPeople.length})
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+            Custos mensais definidos no organograma (campo &quot;custo mensal&quot; da pessoa neste departamento).
+          </Typography>
+          <TableContainer
+            sx={{
+              maxHeight: 200,
+              borderRadius: 1,
+              border: 1,
+              borderColor: 'divider',
+              mb: 2,
+              overflowX: 'hidden',
+              overflowY: 'auto',
+            }}
+          >
+            <Table size="small" stickyHeader padding="none" sx={{ tableLayout: 'fixed', width: '100%' }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '40%' }}>Nome</TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '30%' }}>
+                    Cargo
+                  </TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '15%' }} align="right">
+                    Custo/mês
+                  </TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '15%' }} align="right">
+                    Salário
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orgPeople.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} sx={compactCellSx}>
+                      <Typography variant="body2" color="text.disabled">
+                        Ninguém neste departamento no organograma — atribua em Organograma da Empresa.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  orgPeople.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell title={e.person_name} sx={compactCellSx}>
+                        {e.person_name}
+                      </TableCell>
+                      <TableCell title={e.job_title ?? ''} sx={compactCellSx}>
+                        {e.job_title ?? '—'}
+                      </TableCell>
+                      <TableCell align="right" sx={compactCellSx}>
+                        {money(Number(e.monthly_cost) || 0)}
+                      </TableCell>
+                      <TableCell align="right" sx={compactCellSx}>
+                        {e.monthly_salary != null && Number(e.monthly_salary) > 0
+                          ? money(Number(e.monthly_salary))
+                          : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             Custos fixos vinculados ({costItems.length})
@@ -231,7 +368,10 @@ export function CostCanvasDrawerPanel({
           </TableContainer>
 
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            Pessoas com custo individual ({mems.length})
+            Usuários do sistema — custo mensal ({mems.length})
+          </Typography>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
+            Pessoas com login no sistema vinculadas ao departamento (fluxo legado; time principal vem do organograma).
           </Typography>
           <TableContainer
             sx={{
@@ -270,6 +410,105 @@ export function CostCanvasDrawerPanel({
                       </TableCell>
                       <TableCell align="right" sx={compactCellSx}>
                         {money(Number(m.individual_monthly_cost) || 0)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', mb: 0.75 }}>
+            <Box>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 0 }}>
+                Custos variáveis ({punctuals.length})
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Pontual (data única) ou por <strong>período</strong> (valor total rateável por mês). Entram na soma
+                “Pontuais”.
+              </Typography>
+            </Box>
+            {onAddVariableCost ? (
+              <Button variant="outlined" size="small" onClick={onAddVariableCost}>
+                Novo custo variável
+              </Button>
+            ) : null}
+          </Box>
+          <TableContainer
+            sx={{
+              maxHeight: 220,
+              borderRadius: 1,
+              border: 1,
+              borderColor: 'divider',
+              mb: 2,
+              overflowX: 'hidden',
+              overflowY: 'auto',
+            }}
+          >
+            <Table size="small" stickyHeader padding="none" sx={{ tableLayout: 'fixed', width: '100%' }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '18%' }}>Tipo</TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '32%' }}>Descrição</TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '22%' }}>Data</TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '18%' }} align="right">
+                    Valor
+                  </TableCell>
+                  <TableCell sx={{ ...compactCellSx, fontWeight: 700, width: '10%' }} align="right">
+                    Ações
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {punctuals.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} sx={compactCellSx}>
+                      <Typography variant="body2" color="text.disabled">
+                        Nenhum custo variável. Use &quot;Novo custo variável&quot; ou Gerenciar → Novo custo.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  punctuals.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell sx={compactCellSx}>
+                        <Chip
+                          size="small"
+                          label={p.timing_kind === 'period' ? 'Período' : 'Pontual'}
+                          color={p.timing_kind === 'period' ? 'info' : 'warning'}
+                          variant="outlined"
+                          sx={{ height: 22, fontSize: 10 }}
+                        />
+                      </TableCell>
+                      <TableCell title={p.title} sx={compactCellSx}>
+                        {p.title}
+                      </TableCell>
+                      <TableCell sx={compactCellSx}>
+                        {p.timing_kind === 'period' && p.period_start_date && p.period_end_date
+                          ? `${new Date(p.period_start_date + 'T12:00:00').toLocaleDateString('pt-BR')} — ${new Date(p.period_end_date + 'T12:00:00').toLocaleDateString('pt-BR')}`
+                          : new Date(p.reference_date + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      </TableCell>
+                      <TableCell align="right" sx={compactCellSx}>
+                        {money(Number(p.amount) || 0, p.currency || 'BRL')}
+                      </TableCell>
+                      <TableCell align="right" sx={{ ...compactCellSx, whiteSpace: 'normal' }}>
+                        <Button
+                          size="small"
+                          sx={{ minWidth: 0, px: 0.5, mr: 0.5 }}
+                          onClick={() => onEditPunctualCost?.(p)}
+                          disabled={!onEditPunctualCost}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          sx={{ minWidth: 0, px: 0.5 }}
+                          onClick={() => onDeletePunctualCost?.(p.id)}
+                          disabled={!onDeletePunctualCost}
+                        >
+                          Excluir
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

@@ -1,4 +1,4 @@
-# Central de Tarefas Supply
+# Central de Tarefas - Supply
 
 Sistema de gerenciamento de tarefas, projetos e atividades para o departamento de **Supply Chain** da Flexibase.
 
@@ -90,6 +90,16 @@ npm run dev
 
 Acesse `http://localhost:3005` no navegador.
 
+6. **Usuários base (Auth + `supply_users`)**
+
+Na raiz, com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` do **mesmo projeto** no `.env.local`:
+
+```bash
+npm run seed:supply-users
+```
+
+Isso cria ou atualiza contas com senha inicial `123456789`, marca `must_set_password` e atribui o papel `developer`. No primeiro login, a tela pede nova senha com confirmação. **Mayke** e **Uelington** não podem compartilhar o mesmo e-mail no Auth; defina um e-mail exclusivo para Uelington e inclua no script `backend/scripts/seed-supply-auth-users.mjs` se necessário.
+
 ---
 
 ## Estrutura do Projeto
@@ -133,6 +143,7 @@ Ambos os sistemas compartilham o mesmo projeto Supabase, mas com dados completam
 - `npm run build` — Build de produção
 - `npm run start` — Inicia apenas o backend (serve API + SPA na mesma porta em produção)
 - `npm run install:all` — Instala dependências de todos os workspaces
+- `npm run seed:supply-users` — Seed de usuários Auth + `supply_users` (requer service role)
 
 ---
 

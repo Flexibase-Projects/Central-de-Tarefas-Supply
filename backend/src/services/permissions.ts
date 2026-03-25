@@ -53,7 +53,7 @@ export async function getUserRoles(userId: string): Promise<Role[]> {
       .from('supply_user_roles')
       .select(`
         role_id,
-        cdt_roles (
+        supply_roles (
           id,
           name,
           display_name,
@@ -69,7 +69,7 @@ export async function getUserRoles(userId: string): Promise<Role[]> {
       return [];
     }
 
-    return (data || []).map((item: any) => item.cdt_roles).filter(Boolean);
+    return (data || []).map((item: any) => item.supply_roles).filter(Boolean);
   } catch (error) {
     console.error('Error getting user roles:', error);
     return [];
@@ -97,7 +97,7 @@ export async function getUserPermissions(userId: string): Promise<Permission[]> 
       .from('supply_role_permissions')
       .select(`
         permission_id,
-        cdt_permissions (
+        supply_permissions (
           id,
           name,
           display_name,
@@ -113,7 +113,7 @@ export async function getUserPermissions(userId: string): Promise<Permission[]> 
       return [];
     }
 
-    return (data || []).map((item: any) => item.cdt_permissions).filter(Boolean);
+    return (data || []).map((item: any) => item.supply_permissions).filter(Boolean);
   } catch (error) {
     console.error('Error getting user permissions:', error);
     return [];
@@ -134,12 +134,12 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
       .from('supply_user_roles')
       .select(`
         role_id,
-        cdt_roles!inner (
+        supply_roles!inner (
           name
         )
       `)
       .eq('user_id', userId)
-      .eq('cdt_roles.name', roleName)
+      .eq('supply_roles.name', roleName)
       .single();
 
     return !error && !!data;
@@ -158,11 +158,11 @@ export async function getAdminUserIds(): Promise<string[]> {
       .from('supply_user_roles')
       .select(`
         user_id,
-        cdt_roles!inner (
+        supply_roles!inner (
           name
         )
       `)
-      .eq('cdt_roles.name', 'admin');
+      .eq('supply_roles.name', 'admin');
 
     const nativeEmails = getNativeAdminEmails();
     const nativeAdminsPromise = nativeEmails.length > 0
