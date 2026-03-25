@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_team_canvas')
+      .from('supply_team_canvas')
       .select('id, name, content, updated_at')
       .eq('name', DEFAULT_CANVAS_NAME)
       .maybeSingle();
@@ -75,7 +75,7 @@ router.put('/', async (req, res) => {
     };
 
     const { data, error } = await supabase
-      .from('cdt_team_canvas')
+      .from('supply_team_canvas')
       .upsert(payload, { onConflict: 'name' })
       .select('id, name, content, updated_at')
       .single();

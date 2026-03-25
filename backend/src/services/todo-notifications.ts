@@ -13,7 +13,7 @@ async function resolveTodoContext(params: {
 }): Promise<TodoContext> {
   if (params.projectId) {
     const { data: project } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .select('name')
       .eq('id', params.projectId)
       .maybeSingle();
@@ -26,7 +26,7 @@ async function resolveTodoContext(params: {
 
   if (params.activityId) {
     const { data: activity } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('name')
       .eq('id', params.activityId)
       .maybeSingle();
@@ -47,7 +47,7 @@ async function resolveTodoContext(params: {
 
 export async function clearTodoAssignmentNotifications(todoId: string, userId?: string | null): Promise<void> {
   let query = supabase
-    .from('cdt_notifications')
+    .from('supply_notifications')
     .delete()
     .eq('related_id', todoId)
     .eq('related_type', 'todo')
@@ -77,7 +77,7 @@ export async function notifyTodoAssigned(params: {
 
   await clearTodoAssignmentNotifications(params.todoId, params.assignedTo);
 
-  const { error } = await supabase.from('cdt_notifications').insert({
+  const { error } = await supabase.from('supply_notifications').insert({
     user_id: params.assignedTo,
     type: 'todo_assigned',
     title: 'Novo TO-DO para voce!',
@@ -94,7 +94,7 @@ export async function notifyTodoAssigned(params: {
 
 export async function clearTodoXpPendingNotifications(todoId: string): Promise<void> {
   const { error } = await supabase
-    .from('cdt_notifications')
+    .from('supply_notifications')
     .delete()
     .eq('related_id', todoId)
     .eq('related_type', 'todo')
@@ -133,7 +133,7 @@ export async function notifyAdminsTodoXpPending(params: {
     project_id: ctx.projectId,
   }));
 
-  const { error } = await supabase.from('cdt_notifications').insert(payload);
+  const { error } = await supabase.from('supply_notifications').insert(payload);
   if (error) {
     throw error;
   }

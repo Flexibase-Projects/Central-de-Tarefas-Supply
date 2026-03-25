@@ -50,7 +50,7 @@ async function ensureAdmin(
 
 async function getUserRole(userId: string) {
   const { data } = await supabase
-    .from('cdt_user_roles')
+    .from('supply_user_roles')
     .select(
       `
       role_id,
@@ -74,7 +74,7 @@ async function assignRoleToUser(params: {
   assignedBy: string | null;
 }): Promise<void> {
   const { data: role, error: roleError } = await supabase
-    .from('cdt_roles')
+    .from('supply_roles')
     .select('id, name')
     .eq('id', params.roleId)
     .maybeSingle();
@@ -88,9 +88,9 @@ async function assignRoleToUser(params: {
     throw new Error('Usuario admin nativo deve permanecer com cargo admin.');
   }
 
-  await supabase.from('cdt_user_roles').delete().eq('user_id', params.userId);
+  await supabase.from('supply_user_roles').delete().eq('user_id', params.userId);
 
-  const { error: insertError } = await supabase.from('cdt_user_roles').insert({
+  const { error: insertError } = await supabase.from('supply_user_roles').insert({
     user_id: params.userId,
     role_id: params.roleId,
     assigned_by: params.assignedBy,
@@ -115,7 +115,7 @@ router.get('/auth-list', checkRole('admin'), async (_req, res) => {
 
     if (authUsers.length > 0) {
       const { data: cdtRows } = await supabase
-        .from('cdt_users')
+        .from('supply_users')
         .select('id')
         .in(
           'id',
@@ -167,11 +167,11 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
     const displayName = (name && String(name).trim()) || normalizedEmail.split('@')[0] || 'Usuario';
     let targetUserId = id;
 
-    const byId = await supabase.from('cdt_users').select('id').eq('id', id).maybeSingle();
+    const byId = await supabase.from('supply_users').select('id').eq('id', id).maybeSingle();
     if (!byId.error && byId.data?.id) {
       targetUserId = byId.data.id;
       await supabase
-        .from('cdt_users')
+        .from('supply_users')
         .update({
           email: normalizedEmail,
           name: displayName,
@@ -181,7 +181,7 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
         .eq('id', targetUserId);
     } else {
       const byEmail = await supabase
-        .from('cdt_users')
+        .from('supply_users')
         .select('id')
         .eq('email', normalizedEmail)
         .maybeSingle();
@@ -189,7 +189,7 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
       if (!byEmail.error && byEmail.data?.id) {
         targetUserId = byEmail.data.id;
         await supabase
-          .from('cdt_users')
+          .from('supply_users')
           .update({
             name: displayName,
             is_active: true,
@@ -197,7 +197,7 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
           })
           .eq('id', targetUserId);
       } else {
-        const { error: insertError } = await supabase.from('cdt_users').insert({
+        const { error: insertError } = await supabase.from('supply_users').insert({
           id,
           email: normalizedEmail,
           name: displayName,
@@ -217,7 +217,7 @@ router.post('/from-auth', checkRole('admin'), async (req, res) => {
     }
 
     const { data: userRow, error: userError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('*')
       .eq('id', targetUserId)
       .single();
@@ -284,7 +284,7 @@ router.post('/with-auth', checkRole('admin'), async (req, res) => {
 
     const authUserId = authCreated.user.id;
 
-    const { error: insertError } = await supabase.from('cdt_users').insert({
+    const { error: insertError } = await supabase.from('supply_users').insert({
       id: authUserId,
       email: normalizedEmail,
       name: displayName,
@@ -311,7 +311,7 @@ router.post('/with-auth', checkRole('admin'), async (req, res) => {
     }
 
     const { data: userRow, error: userError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('*')
       .eq('id', authUserId)
       .single();
@@ -349,7 +349,7 @@ router.get('/', async (req, res) => {
 
     if (isForAssignment) {
       const { data: users, error } = await supabase
-        .from('cdt_users')
+        .from('supply_users')
         .select('id, name, email, is_active')
         .eq('is_active', true)
         .order('name', { ascending: true });
@@ -363,7 +363,7 @@ router.get('/', async (req, res) => {
     }
 
     const { data: users, error: usersError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('*')
       .order('created_at', { ascending: false });
     if (usersError) throw usersError;
@@ -396,7 +396,7 @@ router.post('/me/finish-first-login', async (req, res) => {
     }
 
     const { error } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .update({
         must_set_password: false,
         updated_at: new Date().toISOString(),
@@ -434,7 +434,7 @@ router.get('/me', async (req, res) => {
     }
 
     const { data: user, error: userError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('*')
       .eq('id', requesterId)
       .single();
@@ -461,7 +461,7 @@ router.get('/:id', checkRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
     const { data: user, error: userError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('*')
       .eq('id', id)
       .single();
@@ -496,7 +496,7 @@ router.post('/', checkRole('admin'), async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .insert({
         email: String(email).trim().toLowerCase(),
         name: String(name).trim(),
@@ -544,7 +544,7 @@ router.put('/:id', checkRole('admin'), async (req, res) => {
     if (is_active !== undefined) updateData.is_active = is_active;
 
     const { data, error } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -575,7 +575,7 @@ router.delete('/:id', checkRole('admin'), async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
@@ -636,7 +636,7 @@ router.delete('/:id/role', checkRole('admin'), async (req, res) => {
       return res.status(400).json({ error: 'Admin nativo nao pode ficar sem cargo.' });
     }
 
-    const { error } = await supabase.from('cdt_user_roles').delete().eq('user_id', id);
+    const { error } = await supabase.from('supply_user_roles').delete().eq('user_id', id);
     if (error) throw error;
     res.status(204).send();
   } catch (error: unknown) {

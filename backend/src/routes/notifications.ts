@@ -10,7 +10,7 @@ async function cleanupOrphanedNotifications() {
   try {
     // Buscar todas as notificações relacionadas a TODOs
     const { data: todoNotifications, error: fetchError } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .select('id, related_id')
       .eq('related_type', 'todo');
 
@@ -29,7 +29,7 @@ async function cleanupOrphanedNotifications() {
 
     // Buscar todos os IDs de TODOs existentes
     const { data: existingTodos, error: todosError } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('id');
 
     if (todosError) {
@@ -51,7 +51,7 @@ async function cleanupOrphanedNotifications() {
     if (orphanedNotificationIds.length > 0) {
       // Deletar notificações órfãs
       const { error: deleteError } = await supabase
-        .from('cdt_notifications')
+        .from('supply_notifications')
         .delete()
         .in('id', orphanedNotificationIds);
 
@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
     await cleanupOrphanedNotifications();
 
     const { data, error } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
@@ -107,7 +107,7 @@ router.get('/unread-count', async (req, res) => {
     }
 
     const { count, error } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('read', false);
@@ -131,7 +131,7 @@ router.put('/:id/read', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .update({ read: true })
       .eq('id', id)
       .eq('user_id', userId)
@@ -159,7 +159,7 @@ router.put('/read-all', async (req, res) => {
     }
 
     const { error } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .update({ read: true })
       .eq('user_id', userId)
       .eq('read', false);
@@ -183,7 +183,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     const { error } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .delete()
       .eq('id', id)
       .eq('user_id', userId);

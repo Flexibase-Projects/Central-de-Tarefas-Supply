@@ -138,7 +138,7 @@ function dateValue(value: string | null | undefined): number {
 
 async function fetchUsers() {
   const { data, error } = await supabase
-    .from('cdt_users')
+    .from('supply_users')
     .select('id, name, email, avatar_url')
     .eq('is_active', true);
   if (error) throw error;
@@ -146,14 +146,14 @@ async function fetchUsers() {
 }
 
 async function fetchProjects() {
-  const baseQuery = supabase.from('cdt_projects').select('id, name, status, priority_order, created_at');
+  const baseQuery = supabase.from('supply_projects').select('id, name, status, priority_order, created_at');
   const orderedQuery = await baseQuery
     .order('priority_order', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   if (orderedQuery.error && /priority_order|does not exist|column.*not exist/i.test(String(orderedQuery.error.message || ''))) {
     const fallback = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .select('id, name, status, created_at')
       .order('created_at', { ascending: false });
     if (fallback.error) throw fallback.error;
@@ -166,12 +166,12 @@ async function fetchProjects() {
 
 async function fetchTodosForIndicators() {
   const withAssignedAt = await supabase
-    .from('cdt_project_todos')
+    .from('supply_project_todos')
     .select('id, title, project_id, activity_id, created_by, assigned_to, completed, assigned_at, updated_at, created_at, deadline, xp_reward');
 
   if (withAssignedAt.error && /assigned_at|does not exist|column.*not exist/i.test(String(withAssignedAt.error.message || ''))) {
     const fallback = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('id, title, project_id, activity_id, created_by, assigned_to, completed, updated_at, created_at, deadline, xp_reward');
     if (fallback.error) throw fallback.error;
     return (fallback.data ?? []) as TodoRow[];
@@ -183,12 +183,12 @@ async function fetchTodosForIndicators() {
 
 async function fetchActivitiesForIndicators() {
   const withUpdatedAt = await supabase
-    .from('cdt_activities')
+    .from('supply_activities')
     .select('id, name, status, assigned_to, due_date, created_by, updated_at, created_at');
 
   if (withUpdatedAt.error && /updated_at|does not exist|column.*not exist/i.test(String(withUpdatedAt.error.message || ''))) {
     const fallback = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('id, name, status, assigned_to, due_date, created_by');
     if (fallback.error) throw fallback.error;
     return (fallback.data ?? []) as ActivityRow[];
@@ -499,7 +499,7 @@ router.get('/', async (req, res) => {
 
     const [users, commentsRes, todosRes, projects, activitiesList] = await Promise.all([
       fetchUsers(),
-      supabase.from('cdt_comments').select('id, created_by, project_id'),
+      supabase.from('supply_comments').select('id, created_by, project_id'),
       fetchTodosForIndicators(),
       fetchProjects(),
       fetchActivitiesForIndicators(),

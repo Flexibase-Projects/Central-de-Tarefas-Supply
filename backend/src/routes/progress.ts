@@ -63,7 +63,7 @@ function parseNumber(value: unknown, fallback = 0): number {
 async function computeXpAndStats(userId: string): Promise<XpResult> {
   try {
     const { data: xpLog, error: xpLogError } = await supabase
-      .from('cdt_user_xp_log')
+      .from('supply_user_xp_log')
       .select('xp_amount')
       .eq('user_id', userId);
 
@@ -84,12 +84,12 @@ async function computeXpAndStats(userId: string): Promise<XpResult> {
   try {
     const [todosRes, activitiesRes] = await Promise.all([
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .select('xp_reward, completed_at, deadline, achievement_id')
         .eq('assigned_to', userId)
         .eq('completed', true),
       supabase
-        .from('cdt_activities')
+        .from('supply_activities')
         .select('xp_reward, completed_at, due_date')
         .eq('status', 'done')
         .or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
@@ -150,12 +150,12 @@ async function computeXpAndStats(userId: string): Promise<XpResult> {
 
   const [todosRes, activitiesRes] = await Promise.all([
     supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('id')
       .eq('assigned_to', userId)
       .eq('completed', true),
     supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('id')
       .eq('status', 'done')
       .or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
@@ -200,12 +200,12 @@ async function fetchExtendedStats(userId: string): Promise<ExtendedStats> {
 
     const [todosRes, activitiesRes] = await Promise.all([
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .select('id, completed_at, deadline, achievement_id')
         .eq('assigned_to', userId)
         .eq('completed', true),
       supabase
-        .from('cdt_activities')
+        .from('supply_activities')
         .select('id, completed_at, due_date')
         .eq('status', 'done')
         .or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
@@ -251,14 +251,14 @@ async function fetchExtendedStats(userId: string): Promise<ExtendedStats> {
 async function fetchCommentsCount(userId: string): Promise<number> {
   try {
     const primary = await supabase
-      .from('cdt_comments')
+      .from('supply_comments')
       .select('id')
       .eq('created_by', userId);
 
     if (!primary.error) return primary.data?.length ?? 0;
 
     const fallback = await supabase
-      .from('cdt_project_comments')
+      .from('supply_project_comments')
       .select('id')
       .eq('user_id', userId);
     if (fallback.error) return 0;
@@ -271,7 +271,7 @@ async function fetchCommentsCount(userId: string): Promise<number> {
 async function fetchStreakDays(userId: string): Promise<number> {
   try {
     const { data, error } = await supabase
-      .from('cdt_user_xp_log')
+      .from('supply_user_xp_log')
       .select('created_at, reason')
       .eq('user_id', userId)
       .in('reason', ['todo_completed', 'activity_completed'])
@@ -308,14 +308,14 @@ async function fetchAchievements(userId: string, ctx: AchievementContext): Promi
   try {
     const [allRes, userRes] = await Promise.all([
       supabase
-        .from('cdt_achievements')
+        .from('supply_achievements')
         .select(
           'id, slug, name, description, icon, category, rarity, xp_bonus, reward_xp_fixed, reward_percent, condition_type, condition_value, mode',
         )
         .eq('is_active', true)
         .order('slug'),
       supabase
-        .from('cdt_user_achievements')
+        .from('supply_user_achievements')
         .select('achievement_id, unlocked_at')
         .eq('user_id', userId),
     ]);

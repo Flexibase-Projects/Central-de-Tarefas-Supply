@@ -50,8 +50,9 @@ Desktop.ini
 *.sw?
 *.swp
 
-# ── Cursor (IDE) ──────────────────────────────────────────────
+# ── Cursor / Claude (IDE tools) ───────────────────────────────
 .cursor/
+.claude/
 
 # ── Temporary / misc ──────────────────────────────────────────
 tmp/

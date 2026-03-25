@@ -9,16 +9,16 @@ router.use(requireAdmin);
 router.get('/graph', async (_req, res) => {
   try {
     const [{ data: departments }, { data: links }, { data: members }, { data: costItems }] = await Promise.all([
-      supabase.from('cdt_departments').select('*').order('name'),
-      supabase.from('cdt_department_costs').select('*'),
-      supabase.from('cdt_department_members').select('*'),
-      supabase.from('cdt_cost_items').select('*').order('name'),
+      supabase.from('supply_departments').select('*').order('name'),
+      supabase.from('supply_department_costs').select('*'),
+      supabase.from('supply_department_members').select('*'),
+      supabase.from('supply_cost_items').select('*').order('name'),
     ]);
 
     const userIds = [...new Set((members ?? []).map((m: { user_id: string }) => m.user_id))];
     let users: { id: string; name: string; email: string; avatar_url: string | null }[] = [];
     if (userIds.length > 0) {
-      const { data: u } = await supabase.from('cdt_users').select('id, name, email, avatar_url').in('id', userIds);
+      const { data: u } = await supabase.from('supply_users').select('id, name, email, avatar_url').in('id', userIds);
       users = u ?? [];
     }
     const umap = new Map(users.map((u) => [u.id, u]));
@@ -43,10 +43,10 @@ router.get('/graph', async (_req, res) => {
 router.get('/summary', async (_req, res) => {
   try {
     const [{ data: departments }, { data: costLinks }, { data: members }, { data: costItems }] = await Promise.all([
-      supabase.from('cdt_departments').select('id, name'),
-      supabase.from('cdt_department_costs').select('department_id, cost_id'),
-      supabase.from('cdt_department_members').select('department_id, user_id, individual_monthly_cost'),
-      supabase.from('cdt_cost_items').select('id, name, amount, status, is_active, category, activities_description, result_savings_description, result_savings_amount'),
+      supabase.from('supply_departments').select('id, name'),
+      supabase.from('supply_department_costs').select('department_id, cost_id'),
+      supabase.from('supply_department_members').select('department_id, user_id, individual_monthly_cost'),
+      supabase.from('supply_cost_items').select('id, name, amount, status, is_active, category, activities_description, result_savings_description, result_savings_amount'),
     ]);
 
     const deptList = departments ?? [];

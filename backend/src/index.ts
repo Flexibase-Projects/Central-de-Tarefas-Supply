@@ -66,7 +66,7 @@ async function initializeCleanup() {
     
     // Buscar todas as notificações relacionadas a TODOs
     const { data: todoNotifications, error: fetchError } = await supabase
-      .from('cdt_notifications')
+      .from('supply_notifications')
       .select('id, related_id')
       .eq('related_type', 'todo');
 
@@ -85,7 +85,7 @@ async function initializeCleanup() {
 
     // Buscar todos os IDs de TODOs existentes
     const { data: existingTodos, error: todosError } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('id');
 
     if (todosError) {
@@ -107,7 +107,7 @@ async function initializeCleanup() {
     if (orphanedNotificationIds.length > 0) {
       // Deletar notificações órfãs
       const { error: deleteError } = await supabase
-        .from('cdt_notifications')
+        .from('supply_notifications')
         .delete()
         .in('id', orphanedNotificationIds);
 
@@ -155,10 +155,10 @@ async function ensureActivityCoversBucket() {
 
 const app = express();
 // Lê PORT ou BACKEND_PORT (compatível com .env.local que usa BACKEND_PORT).
-const PORT = Number(process.env.PORT) || Number(process.env.BACKEND_PORT) || 3002;
+const PORT = Number(process.env.PORT) || Number(process.env.BACKEND_PORT) || 3004;
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3003',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3005',
   credentials: true
 }));
 

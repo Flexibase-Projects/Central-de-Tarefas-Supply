@@ -9,7 +9,7 @@ export async function hasPermission(userId: string, permissionName: string): Pro
   try {
     // Buscar o cargo do usuário
     const { data: userRole, error: userRoleError } = await supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select('role_id')
       .eq('user_id', userId)
       .single();
@@ -20,7 +20,7 @@ export async function hasPermission(userId: string, permissionName: string): Pro
 
     // Buscar a permissão
     const { data: permission, error: permissionError } = await supabase
-      .from('cdt_permissions')
+      .from('supply_permissions')
       .select('id')
       .eq('name', permissionName)
       .single();
@@ -31,7 +31,7 @@ export async function hasPermission(userId: string, permissionName: string): Pro
 
     // Verificar se o cargo tem a permissão
     const { data: rolePermission, error: rolePermissionError } = await supabase
-      .from('cdt_role_permissions')
+      .from('supply_role_permissions')
       .select('id')
       .eq('role_id', userRole.role_id)
       .eq('permission_id', permission.id)
@@ -50,7 +50,7 @@ export async function hasPermission(userId: string, permissionName: string): Pro
 export async function getUserRoles(userId: string): Promise<Role[]> {
   try {
     const { data, error } = await supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select(`
         role_id,
         cdt_roles (
@@ -83,7 +83,7 @@ export async function getUserPermissions(userId: string): Promise<Permission[]> 
   try {
     // Buscar o cargo do usuário
     const { data: userRole, error: userRoleError } = await supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select('role_id')
       .eq('user_id', userId)
       .single();
@@ -94,7 +94,7 @@ export async function getUserPermissions(userId: string): Promise<Permission[]> 
 
     // Buscar todas as permissões do cargo
     const { data, error } = await supabase
-      .from('cdt_role_permissions')
+      .from('supply_role_permissions')
       .select(`
         permission_id,
         cdt_permissions (
@@ -131,7 +131,7 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
     }
 
     const { data, error } = await supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select(`
         role_id,
         cdt_roles!inner (
@@ -155,7 +155,7 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
 export async function getAdminUserIds(): Promise<string[]> {
   try {
     const roleAdminsPromise = supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select(`
         user_id,
         cdt_roles!inner (
@@ -167,7 +167,7 @@ export async function getAdminUserIds(): Promise<string[]> {
     const nativeEmails = getNativeAdminEmails();
     const nativeAdminsPromise = nativeEmails.length > 0
       ? supabase
-          .from('cdt_users')
+          .from('supply_users')
           .select('id, email')
           .in('email', nativeEmails)
       : Promise.resolve({ data: [], error: null } as const);

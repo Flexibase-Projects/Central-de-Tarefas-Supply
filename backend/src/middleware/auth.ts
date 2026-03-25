@@ -70,7 +70,7 @@ export async function authMiddleware(
 
     let realUserId: string | null = null;
     // Access already granted by id.
-    const byId = await supabase.from('cdt_users').select('id').eq('id', user.id).maybeSingle();
+    const byId = await supabase.from('supply_users').select('id').eq('id', user.id).maybeSingle();
     if (!byId.error && byId.data?.id) {
       realUserId = byId.data.id;
     }
@@ -78,7 +78,7 @@ export async function authMiddleware(
     // Access already granted by email (legacy user rows).
     if (!realUserId && user.email) {
       const byEmail = await supabase
-        .from('cdt_users')
+        .from('supply_users')
         .select('id')
         .eq('email', user.email)
         .maybeSingle();
@@ -114,7 +114,7 @@ export async function authMiddleware(
         const realUserIsAdmin = await hasRole(realUserId, 'admin');
         if (realUserIsAdmin) {
           const target = await supabase
-            .from('cdt_users')
+            .from('supply_users')
             .select('id, is_active')
             .eq('id', requestedUserIdHeader)
             .maybeSingle();

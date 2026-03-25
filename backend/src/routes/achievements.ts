@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import { supabase } from '../config/supabase.js';
 import { isSupabaseConnectionRefused, SUPABASE_UNAVAILABLE_MESSAGE } from '../utils/supabase-errors.js';
 import { PRESET_ACHIEVEMENTS } from '../utils/achievement-engine.js';
@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
     const isAdmin = userId ? await hasRole(userId, 'admin') : false;
 
     let query = supabase
-      .from('cdt_achievements')
+      .from('supply_achievements')
       .select(
         'id, slug, name, description, icon, category, rarity, xp_bonus, reward_xp_fixed, reward_percent, condition_type, condition_value, mode, is_active',
       )
@@ -143,7 +143,7 @@ router.get('/', async (req, res) => {
     const unlockedMap = new Map<string, string | null>();
     try {
       const { data: userAch, error: userAchError } = await supabase
-        .from('cdt_user_achievements')
+        .from('supply_user_achievements')
         .select('achievement_id, unlocked_at')
         .eq('user_id', userId);
 
@@ -263,7 +263,7 @@ router.post('/', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('cdt_achievements')
+      .from('supply_achievements')
       .insert(payload)
       .select(
         'id, slug, name, description, icon, category, rarity, xp_bonus, reward_xp_fixed, reward_percent, condition_type, condition_value, mode, is_active',
@@ -295,7 +295,7 @@ async function updateAchievement(req: express.Request, res: express.Response) {
 
   try {
     const { data, error } = await supabase
-      .from('cdt_achievements')
+      .from('supply_achievements')
       .update(payload)
       .eq('id', id)
       .select(
@@ -328,7 +328,7 @@ router.delete('/:id', async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('cdt_achievements')
+      .from('supply_achievements')
       .update({ is_active: false })
       .eq('id', id)
       .select('id')

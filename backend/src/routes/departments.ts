@@ -13,7 +13,7 @@ function isMissingTable(err: unknown): boolean {
 /** GET /api/departments */
 router.get('/', async (_req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_departments').select('*').order('name');
+    const { data, error } = await supabase.from('supply_departments').select('*').order('name');
     if (error) {
       if (isMissingTable(error)) {
         return res.status(503).json({ error: 'Execute 003_cost_management.sql', code: 'MIGRATION_REQUIRED' });
@@ -29,7 +29,7 @@ router.get('/', async (_req, res) => {
 /** GET /api/departments/:id */
 router.get('/:id', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_departments').select('*').eq('id', req.params.id).maybeSingle();
+    const { data, error } = await supabase.from('supply_departments').select('*').eq('id', req.params.id).maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Not found' });
     res.json(data);
@@ -44,7 +44,7 @@ router.post('/', async (req, res) => {
     const { name, description } = req.body ?? {};
     if (!name || typeof name !== 'string') return res.status(400).json({ error: 'name is required' });
     const { data, error } = await supabase
-      .from('cdt_departments')
+      .from('supply_departments')
       .insert({ name, description: description ?? null })
       .select('*')
       .single();
@@ -62,7 +62,7 @@ router.patch('/:id', async (req, res) => {
     const updates: Record<string, unknown> = {};
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
-    const { data, error } = await supabase.from('cdt_departments').update(updates).eq('id', req.params.id).select('*').single();
+    const { data, error } = await supabase.from('supply_departments').update(updates).eq('id', req.params.id).select('*').single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Not found' });
     res.json(data);
@@ -74,7 +74,7 @@ router.patch('/:id', async (req, res) => {
 /** DELETE /api/departments/:id */
 router.delete('/:id', async (req, res) => {
   try {
-    const { error } = await supabase.from('cdt_departments').delete().eq('id', req.params.id);
+    const { error } = await supabase.from('supply_departments').delete().eq('id', req.params.id);
     if (error) throw error;
     res.status(204).send();
   } catch (e: unknown) {
@@ -86,7 +86,7 @@ router.delete('/:id', async (req, res) => {
 router.get('/:id/costs', async (req, res) => {
   try {
     const { data: links, error } = await supabase
-      .from('cdt_department_costs')
+      .from('supply_department_costs')
       .select('*')
       .eq('department_id', req.params.id);
     if (error) throw error;
@@ -94,7 +94,7 @@ router.get('/:id/costs', async (req, res) => {
     const costIds = list.map((l: { cost_id: string }) => l.cost_id);
     let imap = new Map<string, Record<string, unknown>>();
     if (costIds.length > 0) {
-      const { data: items } = await supabase.from('cdt_cost_items').select('*').in('id', costIds);
+      const { data: items } = await supabase.from('supply_cost_items').select('*').in('id', costIds);
       imap = new Map(
         (items ?? []).map((it: { id: string }) => [it.id, it as unknown as Record<string, unknown>])
       );
@@ -115,7 +115,7 @@ router.post('/:id/costs', async (req, res) => {
     const { cost_id, link_status } = req.body ?? {};
     if (!cost_id) return res.status(400).json({ error: 'cost_id is required' });
     const { data, error } = await supabase
-      .from('cdt_department_costs')
+      .from('supply_department_costs')
       .insert({
         department_id: req.params.id,
         cost_id,
@@ -137,7 +137,7 @@ router.post('/:id/costs', async (req, res) => {
 router.delete('/:id/costs/:costId', async (req, res) => {
   try {
     const { error } = await supabase
-      .from('cdt_department_costs')
+      .from('supply_department_costs')
       .delete()
       .eq('department_id', req.params.id)
       .eq('cost_id', req.params.costId);
@@ -151,12 +151,12 @@ router.delete('/:id/costs/:costId', async (req, res) => {
 /** GET /api/departments/:id/members */
 router.get('/:id/members', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_department_members').select('*').eq('department_id', req.params.id);
+    const { data, error } = await supabase.from('supply_department_members').select('*').eq('department_id', req.params.id);
     if (error) throw error;
     const members = data ?? [];
     const userIds = members.map((m: { user_id: string }) => m.user_id);
     if (userIds.length === 0) return res.json([]);
-    const { data: users } = await supabase.from('cdt_users').select('id, name, email, avatar_url').in('id', userIds);
+    const { data: users } = await supabase.from('supply_users').select('id, name, email, avatar_url').in('id', userIds);
     const umap = new Map(
       (users ?? []).map((u: { id: string; name: string; email: string; avatar_url: string | null }) => [u.id, u])
     );
@@ -176,7 +176,7 @@ router.post('/:id/members', async (req, res) => {
     const { user_id, individual_monthly_cost, role_label } = req.body ?? {};
     if (!user_id) return res.status(400).json({ error: 'user_id is required' });
     const { data, error } = await supabase
-      .from('cdt_department_members')
+      .from('supply_department_members')
       .insert({
         department_id: req.params.id,
         user_id,
@@ -203,7 +203,7 @@ router.patch('/:id/members/:userId', async (req, res) => {
     if (individual_monthly_cost !== undefined) updates.individual_monthly_cost = individual_monthly_cost;
     if (role_label !== undefined) updates.role_label = role_label;
     const { data, error } = await supabase
-      .from('cdt_department_members')
+      .from('supply_department_members')
       .update(updates)
       .eq('department_id', req.params.id)
       .eq('user_id', req.params.userId)
@@ -221,7 +221,7 @@ router.patch('/:id/members/:userId', async (req, res) => {
 router.delete('/:id/members/:userId', async (req, res) => {
   try {
     const { error } = await supabase
-      .from('cdt_department_members')
+      .from('supply_department_members')
       .delete()
       .eq('department_id', req.params.id)
       .eq('user_id', req.params.userId);

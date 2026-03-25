@@ -37,14 +37,14 @@ function parseNumber(value: unknown, fallback = 0): number {
 }
 
 async function fetchOrderedProjects() {
-  const baseQuery = supabase.from('cdt_projects').select('id, name, status, priority_order, created_at');
+  const baseQuery = supabase.from('supply_projects').select('id, name, status, priority_order, created_at');
   const orderedQuery = await baseQuery
     .order('priority_order', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   if (orderedQuery.error && /priority_order|does not exist|column.*not exist/i.test(String(orderedQuery.error.message || ''))) {
     const fallback = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .select('id, name, status, created_at')
       .order('created_at', { ascending: false });
     if (fallback.error) throw fallback.error;
@@ -209,11 +209,11 @@ router.get('/todo-card-summary', async (req, res) => {
     const [projects, activitiesRes, todosRes] = await Promise.all([
       fetchOrderedProjects(),
       supabase
-        .from('cdt_activities')
+        .from('supply_activities')
         .select('id, name, status')
         .order('created_at', { ascending: false }),
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .select('project_id, activity_id, assigned_to, completed, xp_reward'),
     ]);
 
@@ -287,7 +287,7 @@ router.put('/reorder', async (req, res) => {
         return res.status(400).json({ error: 'Each orderedIds item must be a string' });
       }
       const { error } = await supabase
-        .from('cdt_projects')
+        .from('supply_projects')
         .update({ priority_order: i, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) {
@@ -302,7 +302,7 @@ router.put('/reorder', async (req, res) => {
       }
     }
     const { data, error } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .select('*')
       .order('priority_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false });
@@ -319,7 +319,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .select('*')
       .eq('id', id)
       .single();
@@ -350,7 +350,7 @@ router.post('/', async (req, res) => {
     console.log('Creating project with data:', project);
     
     const { data, error } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .insert([{
         name: project.name,
         description: project.description || null,
@@ -416,7 +416,7 @@ router.put('/:id', async (req, res) => {
     if (updates.priority_order !== undefined) updateData.priority_order = updates.priority_order;
 
     const { data, error } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -427,7 +427,7 @@ router.put('/:id', async (req, res) => {
       if (isMapColumnMissing) {
         const { map_quadrant: _mq, map_x: _mx, map_y: _my, ...updateDataWithoutMap } = updateData;
         const { data: dataRetry, error: errorRetry } = await supabase
-          .from('cdt_projects')
+          .from('supply_projects')
           .update(updateDataWithoutMap)
           .eq('id', id)
           .select()
@@ -454,7 +454,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('cdt_projects')
+      .from('supply_projects')
       .delete()
       .eq('id', id);
 

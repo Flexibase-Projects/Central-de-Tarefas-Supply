@@ -9,7 +9,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { data: roles, error: rolesError } = await supabase
-      .from('cdt_roles')
+      .from('supply_roles')
       .select('*')
       .order('display_name', { ascending: true });
 
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
     const rolesWithPermissions = await Promise.all(
       (roles || []).map(async (role: Role) => {
         const { data: permissions } = await supabase
-          .from('cdt_role_permissions')
+          .from('supply_role_permissions')
           .select(`
             permission_id,
             cdt_permissions (
@@ -51,7 +51,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data: role, error: roleError } = await supabase
-      .from('cdt_roles')
+      .from('supply_roles')
       .select('*')
       .eq('id', id)
       .single();
@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
 
     // Buscar permissões do cargo
     const { data: permissions } = await supabase
-      .from('cdt_role_permissions')
+      .from('supply_role_permissions')
       .select(`
         permission_id,
         cdt_permissions (
@@ -96,7 +96,7 @@ router.post('/', checkRole('admin'), async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_roles')
+      .from('supply_roles')
       .insert([{
         name,
         display_name,
@@ -127,7 +127,7 @@ router.put('/:id', checkRole('admin'), async (req, res) => {
     if (description !== undefined) updateData.description = description;
 
     const { data, error } = await supabase
-      .from('cdt_roles')
+      .from('supply_roles')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -151,7 +151,7 @@ router.delete('/:id', checkRole('admin'), async (req, res) => {
 
     // Verificar se há usuários com este cargo
     const { data: userRoles } = await supabase
-      .from('cdt_user_roles')
+      .from('supply_user_roles')
       .select('id')
       .eq('role_id', id)
       .limit(1);
@@ -164,7 +164,7 @@ router.delete('/:id', checkRole('admin'), async (req, res) => {
     }
 
     const { error } = await supabase
-      .from('cdt_roles')
+      .from('supply_roles')
       .delete()
       .eq('id', id);
 
@@ -188,7 +188,7 @@ router.post('/:id/permissions', checkRole('admin'), async (req, res) => {
 
     // Remover permissões existentes do cargo
     await supabase
-      .from('cdt_role_permissions')
+      .from('supply_role_permissions')
       .delete()
       .eq('role_id', id);
 
@@ -200,7 +200,7 @@ router.post('/:id/permissions', checkRole('admin'), async (req, res) => {
       }));
 
       const { error } = await supabase
-        .from('cdt_role_permissions')
+        .from('supply_role_permissions')
         .insert(rolePermissions);
 
       if (error) throw error;
@@ -219,7 +219,7 @@ router.delete('/:id/permissions/:permissionId', checkRole('admin'), async (req, 
     const { id, permissionId } = req.params;
 
     const { error } = await supabase
-      .from('cdt_role_permissions')
+      .from('supply_role_permissions')
       .delete()
       .eq('role_id', id)
       .eq('permission_id', permissionId);

@@ -9,7 +9,7 @@ router.get('/project/:projectId', async (req, res) => {
   try {
     const { projectId } = req.params;
     const { data, error } = await supabase
-      .from('cdt_tasks')
+      .from('supply_tasks')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('cdt_tasks')
+      .from('supply_tasks')
       .select('*')
       .eq('id', id)
       .single();
@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
     const task: Partial<Task> = req.body;
     
     const { data, error } = await supabase
-      .from('cdt_tasks')
+      .from('supply_tasks')
       .insert([{
         project_id: task.project_id,
         title: task.title,
@@ -77,7 +77,7 @@ router.put('/:id', async (req, res) => {
     const updates: Partial<Task> = req.body;
 
     const { data, error } = await supabase
-      .from('cdt_tasks')
+      .from('supply_tasks')
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
@@ -102,7 +102,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { error } = await supabase
-      .from('tasks')
+      .from('supply_tasks')
       .delete()
       .eq('id', id);
 

@@ -19,7 +19,7 @@ function resolveApiProxyTarget(env: Record<string, string>): string {
       )
     }
   }
-  const port = Number(env.BACKEND_PORT) || 3002
+  const port = Number(env.BACKEND_PORT) || 3004
   const host = (env.BACKEND_HOST || '127.0.0.1').trim() || '127.0.0.1'
   return `http://${host}:${port}`
 }
@@ -41,9 +41,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: Number(env.VITE_PORT) || 3003,
+      port: Number(env.VITE_PORT) || 3005,
       host: env.VITE_HOST || 'localhost',
-      allowedHosts: ['cdt.flexibase.com'],
+      allowedHosts: ['cdt-supply.flexibase.com', 'cdt.flexibase.com'],
       hmr: env.VITE_HMR_HOST
         ? {
             host: env.VITE_HMR_HOST,

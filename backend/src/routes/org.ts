@@ -114,7 +114,7 @@ function parseMoneyBody(v: unknown): number | null | undefined {
 
 async function fetchOrgRows(): Promise<{ rows: OrgRow[]; error: unknown }> {
   const { data, error } = await supabase
-    .from('cdt_user_org')
+    .from('supply_user_org')
     .select(
       'id, person_name, reports_to_id, job_title, display_order, department_id, monthly_salary, monthly_cost'
     )
@@ -158,7 +158,7 @@ router.get('/tree', async (_req, res) => {
 router.get('/entries', async (_req, res) => {
   try {
     const { data, error } = await supabase
-      .from('cdt_user_org')
+      .from('supply_user_org')
       .select(
         'id, person_name, reports_to_id, job_title, display_order, department_id, monthly_salary, monthly_cost, created_at, updated_at'
       )
@@ -200,7 +200,7 @@ router.post('/entries', async (req, res) => {
     let parentId: string | null =
       reports_to_id && typeof reports_to_id === 'string' && reports_to_id.trim() ? reports_to_id.trim() : null;
     if (parentId) {
-      const { data: parentRow } = await supabase.from('cdt_user_org').select('id').eq('id', parentId).maybeSingle();
+      const { data: parentRow } = await supabase.from('supply_user_org').select('id').eq('id', parentId).maybeSingle();
       if (!parentRow) return res.status(400).json({ error: 'reports_to_id: entrada pai não encontrada' });
     }
 
@@ -219,7 +219,7 @@ router.post('/entries', async (req, res) => {
       monthly_cost: mc,
     };
 
-    const { data, error } = await supabase.from('cdt_user_org').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('supply_user_org').insert(payload).select('*').single();
     if (error) throw error;
     res.status(201).json(data);
   } catch (e: unknown) {
@@ -249,7 +249,7 @@ router.patch('/entries/:id', async (req, res) => {
         return res.status(400).json({ error: 'reports_to_id cannot equal own id' });
       }
       if (v) {
-        const { data: parentRow } = await supabase.from('cdt_user_org').select('id').eq('id', v).maybeSingle();
+        const { data: parentRow } = await supabase.from('supply_user_org').select('id').eq('id', v).maybeSingle();
         if (!parentRow) return res.status(400).json({ error: 'reports_to_id: entrada pai não encontrada' });
       }
       updates.reports_to_id = v;
@@ -275,7 +275,7 @@ router.patch('/entries/:id', async (req, res) => {
       updates.monthly_cost = m;
     }
 
-    const { data, error } = await supabase.from('cdt_user_org').update(updates).eq('id', id).select('*').single();
+    const { data, error } = await supabase.from('supply_user_org').update(updates).eq('id', id).select('*').single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Not found' });
     res.json(data);
@@ -289,7 +289,7 @@ router.patch('/entries/:id', async (req, res) => {
 /** DELETE /api/org/entries/:id */
 router.delete('/entries/:id', async (req, res) => {
   try {
-    const { error } = await supabase.from('cdt_user_org').delete().eq('id', req.params.id);
+    const { error } = await supabase.from('supply_user_org').delete().eq('id', req.params.id);
     if (error) throw error;
     res.status(204).send();
   } catch (e: unknown) {
@@ -303,7 +303,7 @@ router.delete('/entries/:id', async (req, res) => {
 router.get('/entry/:entryId/subtree', async (req, res) => {
   try {
     const { entryId } = req.params;
-    const { data, error } = await supabase.from('cdt_user_org').select('id, reports_to_id, display_order');
+    const { data, error } = await supabase.from('supply_user_org').select('id, reports_to_id, display_order');
     if (error) {
       if (isMissingTable(error)) {
         return res.status(503).json({ error: 'Migration required', code: 'MIGRATION_REQUIRED' });
@@ -336,7 +336,7 @@ router.delete('/entry/:entryId/subtree', async (req, res) => {
   try {
     const { entryId } = req.params;
     const { data, error } = await supabase
-      .from('cdt_user_org')
+      .from('supply_user_org')
       .select('id, person_name, reports_to_id, job_title, display_order, department_id, monthly_salary, monthly_cost');
     if (error) {
       if (isMissingTable(error)) {
@@ -357,7 +357,7 @@ router.delete('/entry/:entryId/subtree', async (req, res) => {
       return res.status(404).json({ error: 'Nada para excluir' });
     }
 
-    const { error: deleteError } = await supabase.from('cdt_user_org').delete().in('id', deleteIds);
+    const { error: deleteError } = await supabase.from('supply_user_org').delete().in('id', deleteIds);
     if (deleteError) throw deleteError;
 
     return res.json({
@@ -389,7 +389,7 @@ router.get('/entry/:entryId/summary', async (req, res) => {
     const deptIds = [...new Set(teamRows.map((r) => r.department_id).filter(Boolean))] as string[];
     let deptNameById = new Map<string, string>();
     if (deptIds.length > 0) {
-      const { data: depts } = await supabase.from('cdt_departments').select('id, name').in('id', deptIds);
+      const { data: depts } = await supabase.from('supply_departments').select('id, name').in('id', deptIds);
       deptNameById = new Map((depts ?? []).map((d: { id: string; name: string }) => [d.id, d.name]));
     }
 

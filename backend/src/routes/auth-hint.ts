@@ -19,7 +19,7 @@ router.post('/first-access-hint', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('must_set_password')
       .eq('email', normalized)
       .maybeSingle();
@@ -52,7 +52,7 @@ router.post('/set-initial-password', async (req, res) => {
     }
 
     const { data: row, error: rowError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .select('id, must_set_password')
       .eq('email', normalized)
       .maybeSingle();
@@ -73,7 +73,7 @@ router.post('/set-initial-password', async (req, res) => {
     }
 
     const { error: updError } = await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .update({
         must_set_password: false,
         updated_at: new Date().toISOString(),

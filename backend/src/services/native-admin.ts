@@ -27,7 +27,7 @@ export function isNativeAdminEmail(email: string | null | undefined): boolean {
 
 async function ensureAdminRoleId(): Promise<string | null> {
   const existing = await supabase
-    .from('cdt_roles')
+    .from('supply_roles')
     .select('id')
     .eq('name', 'admin')
     .maybeSingle();
@@ -37,7 +37,7 @@ async function ensureAdminRoleId(): Promise<string | null> {
   }
 
   const created = await supabase
-    .from('cdt_roles')
+    .from('supply_roles')
     .insert({
       name: 'admin',
       display_name: 'Administrador',
@@ -61,7 +61,7 @@ async function ensureUserRow(params: {
   avatarUrl: string | null;
 }): Promise<string | null> {
   const byId = await supabase
-    .from('cdt_users')
+    .from('supply_users')
     .select('id')
     .eq('id', params.authUserId)
     .maybeSingle();
@@ -71,14 +71,14 @@ async function ensureUserRow(params: {
   }
 
   const byEmail = await supabase
-    .from('cdt_users')
+    .from('supply_users')
     .select('id')
     .eq('email', params.email)
     .maybeSingle();
 
   if (!byEmail.error && byEmail.data?.id) {
     await supabase
-      .from('cdt_users')
+      .from('supply_users')
       .update({
         is_active: true,
         name: params.name,
@@ -90,7 +90,7 @@ async function ensureUserRow(params: {
   }
 
   const inserted = await supabase
-    .from('cdt_users')
+    .from('supply_users')
     .insert({
       id: params.authUserId,
       email: params.email,
@@ -111,7 +111,7 @@ async function ensureUserRow(params: {
 
 async function ensureAdminRoleAssignment(userId: string, roleId: string): Promise<void> {
   const existing = await supabase
-    .from('cdt_user_roles')
+    .from('supply_user_roles')
     .select('id')
     .eq('user_id', userId)
     .eq('role_id', roleId)
@@ -119,9 +119,9 @@ async function ensureAdminRoleAssignment(userId: string, roleId: string): Promis
 
   if (!existing.error && existing.data?.id) return;
 
-  await supabase.from('cdt_user_roles').delete().eq('user_id', userId);
+  await supabase.from('supply_user_roles').delete().eq('user_id', userId);
 
-  const inserted = await supabase.from('cdt_user_roles').insert({
+  const inserted = await supabase.from('supply_user_roles').insert({
     user_id: userId,
     role_id: roleId,
     assigned_by: null,
@@ -160,7 +160,7 @@ export async function ensureNativeAdminAccess(params: {
 
 export async function isNativeAdminUserId(userId: string): Promise<boolean> {
   const userRes = await supabase
-    .from('cdt_users')
+    .from('supply_users')
     .select('email')
     .eq('id', userId)
     .maybeSingle();

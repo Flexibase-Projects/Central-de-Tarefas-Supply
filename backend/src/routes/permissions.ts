@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('cdt_permissions')
+      .from('supply_permissions')
       .select('*')
       .order('category', { ascending: true })
       .order('display_name', { ascending: true });
@@ -26,7 +26,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('cdt_permissions')
+      .from('supply_permissions')
       .select('*')
       .eq('id', id)
       .single();

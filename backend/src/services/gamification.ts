@@ -116,7 +116,7 @@ async function hasXpLogEntry(
   relatedType: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
-    .from('cdt_user_xp_log')
+    .from('supply_user_xp_log')
     .select('id')
     .eq('user_id', userId)
     .eq('reason', reason)
@@ -132,7 +132,7 @@ async function getTodoCompletionCycleState(
   todoId: string,
 ): Promise<TodoCompletionCycleState> {
   const { data, error } = await supabase
-    .from('cdt_user_xp_log')
+    .from('supply_user_xp_log')
     .select('id, xp_amount, reason, created_at')
     .eq('user_id', userId)
     .eq('related_id', todoId)
@@ -178,7 +178,7 @@ async function insertXpLog(params: {
 }): Promise<boolean> {
   const rounded = roundXp(params.xpAmount);
   if (rounded === 0) return false;
-  const { error } = await supabase.from('cdt_user_xp_log').insert({
+  const { error } = await supabase.from('supply_user_xp_log').insert({
     user_id: params.userId,
     xp_amount: rounded,
     reason: params.reason,
@@ -193,18 +193,18 @@ async function insertXpLog(params: {
 
 async function fetchStats(userId: string): Promise<UserStatsContext> {
   const [xpLogRes, todosRes, activitiesRes, commentsRes] = await Promise.all([
-    supabase.from('cdt_user_xp_log').select('xp_amount').eq('user_id', userId),
+    supabase.from('supply_user_xp_log').select('xp_amount').eq('user_id', userId),
     supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('id, completed_at, deadline, achievement_id')
       .eq('assigned_to', userId)
       .eq('completed', true),
     supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('id, completed_at, due_date')
       .eq('status', 'done')
       .or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
-    supabase.from('cdt_project_comments').select('id').eq('user_id', userId),
+    supabase.from('supply_project_comments').select('id').eq('user_id', userId),
   ]);
 
   let totalXpFromLog = 0;
@@ -242,12 +242,12 @@ async function fetchStats(userId: string): Promise<UserStatsContext> {
   if (totalXp <= 0 && (completedTodos > 0 || completedActivities > 0)) {
     const [legacyTodoXpRes, legacyActivityXpRes] = await Promise.all([
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .select('xp_reward')
         .eq('assigned_to', userId)
         .eq('completed', true),
       supabase
-        .from('cdt_activities')
+        .from('supply_activities')
         .select('xp_reward')
         .eq('status', 'done')
         .or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
@@ -284,13 +284,13 @@ async function fetchStats(userId: string): Promise<UserStatsContext> {
 async function fetchStreakDaysFromCompletions(userId: string): Promise<number> {
   const [todoDaysRes, activityDaysRes] = await Promise.all([
     supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('completed_at')
       .eq('assigned_to', userId)
       .eq('completed', true)
       .not('completed_at', 'is', null),
     supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('completed_at')
       .eq('status', 'done')
       .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
@@ -325,7 +325,7 @@ async function fetchStreakDaysFromCompletions(userId: string): Promise<number> {
 }
 
 async function ensureAchievementUnlocked(userId: string, achievementId: string): Promise<boolean> {
-  const { error } = await supabase.from('cdt_user_achievements').insert({
+  const { error } = await supabase.from('supply_user_achievements').insert({
     user_id: userId,
     achievement_id: achievementId,
   });
@@ -337,7 +337,7 @@ async function ensureAchievementUnlocked(userId: string, achievementId: string):
 
 async function fetchActiveAchievements(): Promise<DbAchievement[]> {
   const { data, error } = await supabase
-    .from('cdt_achievements')
+    .from('supply_achievements')
     .select(
       'id, slug, reward_xp_fixed, reward_percent, xp_bonus, condition_type, condition_value, mode',
     )
@@ -348,7 +348,7 @@ async function fetchActiveAchievements(): Promise<DbAchievement[]> {
 
 async function fetchUnlockedAchievementIds(userId: string): Promise<Set<string>> {
   const { data, error } = await supabase
-    .from('cdt_user_achievements')
+    .from('supply_user_achievements')
     .select('achievement_id')
     .eq('user_id', userId);
   if (error || !data) return new Set<string>();
@@ -373,7 +373,7 @@ export async function getLinkedAchievementReward(
     return { fixedXp: 0, percent: 0 };
   }
   const { data, error } = await supabase
-    .from('cdt_achievements')
+    .from('supply_achievements')
     .select('id, slug, reward_xp_fixed, reward_percent, xp_bonus, condition_type, condition_value, mode')
     .eq('id', achievementId)
     .eq('is_active', true)

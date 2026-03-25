@@ -140,7 +140,7 @@ async function insertTodoCompat(insertData: Record<string, unknown>, options?: {
   let clearedCreatedBy = false;
 
   while (true) {
-    const result = await supabase.from('cdt_project_todos').insert(payload).select().single();
+    const result = await supabase.from('supply_project_todos').insert(payload).select().single();
     if (!result.error) return result;
 
     if (
@@ -182,7 +182,7 @@ async function updateTodoCompat(id: string, updateData: Record<string, unknown>)
 
   while (true) {
     const result = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .update(payload)
       .eq('id', id)
       .select()
@@ -221,7 +221,7 @@ async function getTodoByIdCompat(id: string) {
 
   while (true) {
     const result = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select(columns.join(', '))
       .eq('id', id)
       .single();
@@ -260,7 +260,7 @@ async function getNextSortOrder(params: {
 }): Promise<number> {
   if (params.projectId) {
     const { data: maxTodo } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('sort_order')
       .eq('project_id', params.projectId)
       .order('sort_order', { ascending: false })
@@ -270,7 +270,7 @@ async function getNextSortOrder(params: {
   }
 
   const { data: maxTodo } = await supabase
-    .from('cdt_project_todos')
+    .from('supply_project_todos')
     .select('sort_order')
     .eq('activity_id', params.activityId ?? '')
     .order('sort_order', { ascending: false })
@@ -317,7 +317,7 @@ router.get('/by-activity/:activityId', async (req, res) => {
     const { activityId } = req.params;
 
     const { data, error } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('*')
       .eq('activity_id', activityId)
       .order('sort_order', { ascending: true });
@@ -336,7 +336,7 @@ router.get('/:projectId', async (req, res) => {
     const { projectId } = req.params;
 
     const { data, error } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .select('*')
       .eq('project_id', projectId)
       .order('sort_order', { ascending: true });
@@ -650,7 +650,7 @@ router.delete('/:id', async (req, res) => {
     await clearTodoXpPendingNotifications(id);
 
     const { error } = await supabase
-      .from('cdt_project_todos')
+      .from('supply_project_todos')
       .delete()
       .eq('id', id);
 
@@ -676,7 +676,7 @@ router.post('/reorder-activity', async (req, res) => {
 
     const updates = todo_ids.map((todoId: string, index: number) =>
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .update({ sort_order: index })
         .eq('id', todoId)
         .eq('activity_id', activity_id),
@@ -704,7 +704,7 @@ router.post('/reorder', async (req, res) => {
 
     const updates = todo_ids.map((todoId: string, index: number) =>
       supabase
-        .from('cdt_project_todos')
+        .from('supply_project_todos')
         .update({ sort_order: index })
         .eq('id', todoId)
         .eq('project_id', project_id),

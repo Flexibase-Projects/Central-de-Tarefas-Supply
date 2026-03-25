@@ -16,7 +16,7 @@ function isMissingTable(err: unknown): boolean {
 /** GET /api/cost-items */
 router.get('/', async (req, res) => {
   try {
-    let q = supabase.from('cdt_cost_items').select('*').order('name');
+    let q = supabase.from('supply_cost_items').select('*').order('name');
     const { status, is_active, category, department_id } = req.query;
     if (typeof status === 'string' && VALID_STATUS.includes(status as (typeof VALID_STATUS)[number])) {
       q = q.eq('status', status);
@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
       q = q.eq('category', category);
     }
     if (typeof department_id === 'string') {
-      const { data: links } = await supabase.from('cdt_department_costs').select('cost_id').eq('department_id', department_id);
+      const { data: links } = await supabase.from('supply_department_costs').select('cost_id').eq('department_id', department_id);
       const ids = (links ?? []).map((l: { cost_id: string }) => l.cost_id);
       if (ids.length === 0) return res.json([]);
       q = q.in('id', ids);
@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
 /** GET /api/cost-items/:id */
 router.get('/:id', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_cost_items').select('*').eq('id', req.params.id).maybeSingle();
+    const { data, error } = await supabase.from('supply_cost_items').select('*').eq('id', req.params.id).maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Not found' });
     res.json(data);
@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
       result_savings_description: b.result_savings_description ?? null,
       result_savings_amount: b.result_savings_amount != null ? Number(b.result_savings_amount) : null,
     };
-    const { data, error } = await supabase.from('cdt_cost_items').insert(payload).select('*').single();
+    const { data, error } = await supabase.from('supply_cost_items').insert(payload).select('*').single();
     if (error) throw error;
     res.status(201).json(data);
   } catch (e: unknown) {
@@ -106,7 +106,7 @@ router.patch('/:id', async (req, res) => {
         else updates[f] = b[f];
       }
     }
-    const { data, error } = await supabase.from('cdt_cost_items').update(updates).eq('id', req.params.id).select('*').single();
+    const { data, error } = await supabase.from('supply_cost_items').update(updates).eq('id', req.params.id).select('*').single();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Not found' });
     res.json(data);
@@ -118,7 +118,7 @@ router.patch('/:id', async (req, res) => {
 /** DELETE /api/cost-items/:id */
 router.delete('/:id', async (req, res) => {
   try {
-    const { error } = await supabase.from('cdt_cost_items').delete().eq('id', req.params.id);
+    const { error } = await supabase.from('supply_cost_items').delete().eq('id', req.params.id);
     if (error) throw error;
     res.status(204).send();
   } catch (e: unknown) {
@@ -129,7 +129,7 @@ router.delete('/:id', async (req, res) => {
 /** GET /api/cost-items/:id/allocations */
 router.get('/:id/allocations', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_person_cost_allocations').select('*').eq('cost_id', req.params.id);
+    const { data, error } = await supabase.from('supply_person_cost_allocations').select('*').eq('cost_id', req.params.id);
     if (error) throw error;
     res.json(data ?? []);
   } catch (e: unknown) {
@@ -143,7 +143,7 @@ router.post('/:id/allocations', async (req, res) => {
     const { department_id, user_id, allocation_pct, amount } = req.body ?? {};
     if (!department_id || !user_id) return res.status(400).json({ error: 'department_id and user_id required' });
     const { data, error } = await supabase
-      .from('cdt_person_cost_allocations')
+      .from('supply_person_cost_allocations')
       .insert({
         cost_id: req.params.id,
         department_id,
@@ -166,7 +166,7 @@ router.post('/:id/allocations', async (req, res) => {
 /** DELETE /api/cost-items/:id/allocations/:allocationId */
 router.delete('/:id/allocations/:allocationId', async (req, res) => {
   try {
-    const { error } = await supabase.from('cdt_person_cost_allocations').delete().eq('id', req.params.allocationId);
+    const { error } = await supabase.from('supply_person_cost_allocations').delete().eq('id', req.params.allocationId);
     if (error) throw error;
     res.status(204).send();
   } catch (e: unknown) {

@@ -59,7 +59,7 @@ router.get('/', async (_req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -76,7 +76,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { data, error } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select('*')
       .eq('id', id)
       .single();
@@ -119,7 +119,7 @@ router.post('/', async (req, res) => {
     const isDone = (activity.status || 'backlog') === 'done';
 
     const { data, error } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .insert([
         {
           name: activity.name,
@@ -244,7 +244,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const { data: currentActivity, error: currentError } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .select(
         'id, name, status, due_date, assigned_to, created_by, xp_reward, deadline_bonus_percent, achievement_id, completed_at',
       )
@@ -303,7 +303,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -376,7 +376,7 @@ router.delete('/:id', async (req, res) => {
 
     const { id } = req.params;
     const { error } = await supabase
-      .from('cdt_activities')
+      .from('supply_activities')
       .delete()
       .eq('id', id);
 

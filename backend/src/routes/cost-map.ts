@@ -8,7 +8,7 @@ router.use(requireAdmin);
 /** GET /api/cost-map/layout */
 router.get('/layout', async (_req, res) => {
   try {
-    const { data, error } = await supabase.from('cdt_cost_map_layout').select('*');
+    const { data, error } = await supabase.from('supply_cost_map_layout').select('*');
     if (error) throw error;
     res.json(data ?? []);
   } catch (e: unknown) {
@@ -35,11 +35,11 @@ router.put('/layout', async (req, res) => {
       position_y: Number(r.position_y) || 0,
       updated_at: new Date().toISOString(),
     }));
-    const { error } = await supabase.from('cdt_cost_map_layout').upsert(upserts, {
+    const { error } = await supabase.from('supply_cost_map_layout').upsert(upserts, {
       onConflict: 'entity_type,entity_id',
     });
     if (error) throw error;
-    const { data } = await supabase.from('cdt_cost_map_layout').select('*');
+    const { data } = await supabase.from('supply_cost_map_layout').select('*');
     res.json(data ?? []);
   } catch (e: unknown) {
     res.status(500).json({ error: (e as Error).message });
